@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>WebAR 浸水シミュレーション MVP v2.3</title>
+  <title>WebAR 浸水深シミュレーション v2.5</title>
 
   <style>
     :root {
@@ -12,10 +12,10 @@
       --panel-border: rgba(255, 255, 255, 0.22);
       --button-bg: #effcff;
       --button-text: #073247;
-      --water-blue-1: rgba(95, 220, 242, 0.32);
-      --water-blue-2: rgba(18, 139, 188, 0.62);
-      --water-opacity: 1;
-      --caustics-opacity: 0.24;
+      --water-blue-1: rgba(92, 200, 218, 0.26);
+      --water-blue-2: rgba(18, 126, 170, 0.52);
+      --water-opacity: 0.88;
+      --caustics-opacity: 0.20;
     }
 
     html,
@@ -63,11 +63,11 @@
       pointer-events: none;
       opacity: var(--water-opacity);
       background:
-        radial-gradient(circle at 24% 16%, rgba(230, 255, 255, 0.22), transparent 23%),
-        radial-gradient(circle at 78% 44%, rgba(190, 242, 255, 0.16), transparent 31%),
+        radial-gradient(circle at 24% 16%, rgba(235, 255, 255, 0.16), transparent 23%),
+        radial-gradient(circle at 78% 44%, rgba(200, 242, 255, 0.12), transparent 31%),
         linear-gradient(to bottom, var(--water-blue-1), var(--water-blue-2));
-      backdrop-filter: blur(1.15px) saturate(1.15) contrast(0.94);
-      -webkit-backdrop-filter: blur(1.15px) saturate(1.15) contrast(0.94);
+      backdrop-filter: blur(0.95px) saturate(1.10) contrast(0.96);
+      -webkit-backdrop-filter: blur(0.95px) saturate(1.10) contrast(0.96);
       transition: opacity 0.25s ease, top 0.16s ease;
     }
 
@@ -81,8 +81,8 @@
       pointer-events: none;
       opacity: var(--caustics-opacity);
       background-image:
-        repeating-radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.18) 0 1px, transparent 2px 24px),
-        repeating-radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.10) 0 1px, transparent 2px 30px);
+        repeating-radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.14) 0 1px, transparent 2px 24px),
+        repeating-radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.08) 0 1px, transparent 2px 30px);
       background-size: 280px 190px, 330px 230px;
       filter: blur(1.4px);
       mix-blend-mode: screen;
@@ -91,12 +91,8 @@
     }
 
     @keyframes causticsMove {
-      from {
-        background-position: 0 0, 0 0;
-      }
-      to {
-        background-position: 280px 190px, -330px 230px;
-      }
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 280px 190px, -330px 230px; }
     }
 
     #water-line {
@@ -104,8 +100,8 @@
       left: 0;
       right: 0;
       top: var(--water-top);
-      height: 70px;
-      transform: translateY(-35px);
+      height: 62px;
+      transform: translateY(-31px);
       z-index: 5;
       pointer-events: none;
       opacity: 1;
@@ -120,25 +116,25 @@
 
     #wave-shadow {
       fill: none;
-      stroke: rgba(0, 58, 92, 0.50);
-      stroke-width: 16;
+      stroke: rgba(0, 58, 92, 0.44);
+      stroke-width: 10;
       stroke-linecap: round;
     }
 
     #wave-highlight {
       fill: none;
-      stroke: rgba(226, 254, 255, 0.94);
-      stroke-width: 4;
+      stroke: rgba(224, 254, 255, 0.86);
+      stroke-width: 3;
       stroke-linecap: round;
-      filter: drop-shadow(0 2px 4px rgba(0, 80, 130, 0.62));
+      filter: drop-shadow(0 2px 3px rgba(0, 80, 130, 0.48));
     }
 
     #wave-thin {
       fill: none;
-      stroke: rgba(130, 235, 255, 0.56);
-      stroke-width: 2;
+      stroke: rgba(130, 225, 245, 0.42);
+      stroke-width: 1.5;
       stroke-linecap: round;
-      transform: translateY(9px);
+      transform: translateY(8px);
     }
 
     #water-depth-guide {
@@ -148,23 +144,24 @@
       top: var(--water-top);
       z-index: 6;
       transform: translateY(-1px);
-      border-top: 2px dashed rgba(255, 255, 255, 0.72);
+      border-top: 1.5px dashed rgba(255, 255, 255, 0.52);
       pointer-events: none;
-      opacity: 0.4;
+      opacity: 0.28;
+      transition: opacity 0.25s ease, top 0.16s ease;
     }
 
     #fixed-badge {
       position: fixed;
       right: 12px;
-      top: calc(var(--water-top) - 52px);
+      top: calc(var(--water-top) - 48px);
       z-index: 7;
-      background: rgba(0, 40, 60, 0.72);
+      background: rgba(0, 40, 60, 0.70);
       border: 1px solid rgba(255, 255, 255, 0.28);
       color: white;
       border-radius: 999px;
       padding: 6px 10px;
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 900;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.2s ease, top 0.16s ease;
@@ -197,6 +194,7 @@
       -webkit-backdrop-filter: blur(9px);
       max-width: 680px;
       margin-inline: auto;
+      transition: opacity 0.22s ease, transform 0.22s ease, max-height 0.22s ease;
     }
 
     #title {
@@ -244,6 +242,16 @@
       color: #063f25;
     }
 
+    button.mode {
+      background: #e8ecff;
+      color: #10245d;
+    }
+
+    button.primary {
+      background: #dff8ff;
+      color: #053244;
+    }
+
     button:active {
       transform: translateY(1px);
     }
@@ -273,6 +281,21 @@
       opacity: 0.95;
     }
 
+    #effect-controls {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 10px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    #effect-controls label {
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0.92;
+      white-space: nowrap;
+    }
+
     #help {
       margin-top: 8px;
       font-size: 12px;
@@ -297,11 +320,6 @@
       color: rgba(255,255,255,0.74);
     }
 
-    /* UI compact / hidden controls */
-    #ui-panel {
-      transition: opacity 0.22s ease, transform 0.22s ease, max-height 0.22s ease;
-    }
-
     body.ui-compact #ui-panel {
       padding: 10px;
       border-radius: 14px;
@@ -315,7 +333,8 @@
 
     body.ui-compact #status,
     body.ui-compact #help,
-    body.ui-compact #notice {
+    body.ui-compact #notice,
+    body.ui-compact #effect-controls {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -364,7 +383,9 @@
       color: #073247;
       border: 1px solid rgba(255,255,255,0.5);
       border-radius: 999px;
-      padding: 10px 16px;
+      padding: 8px 13px;
+      min-height: 34px;
+      font-size: 13px;
       font-weight: 900;
       box-shadow: 0 8px 26px rgba(0,0,0,0.28);
     }
@@ -375,30 +396,30 @@
       transform: translateY(0);
     }
 
-
-    #effect-controls {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 8px 10px;
-      align-items: center;
-      margin-top: 8px;
-    }
-
-    #effect-controls label {
-      font-size: 12px;
-      font-weight: 800;
-      opacity: 0.92;
+    #toast {
+      position: fixed;
+      left: 50%;
+      top: max(18px, env(safe-area-inset-top));
+      z-index: 10001;
+      transform: translateX(-50%) translateY(-12px);
+      opacity: 0;
+      pointer-events: none;
+      color: #fff;
+      background: rgba(0, 34, 54, 0.82);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 900;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.32);
+      transition: opacity 0.22s ease, transform 0.22s ease;
       white-space: nowrap;
     }
 
-    body.ui-compact #effect-controls {
-      display: none;
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
-
-    body.ui-hidden #fixed-badge {
-      opacity: 0.95;
-    }
-
   </style>
 </head>
 
@@ -410,25 +431,27 @@
   <div id="caustics-overlay" aria-hidden="true"></div>
 
   <div id="water-line" aria-hidden="true">
-    <svg viewBox="0 0 1200 110" preserveAspectRatio="none">
-      <path id="wave-shadow" d="M0,55 C100,32 200,78 300,55 C400,32 500,78 600,55 C700,32 800,78 900,55 C1000,32 1100,78 1200,55"></path>
-      <path id="wave-highlight" d="M0,55 C100,32 200,78 300,55 C400,32 500,78 600,55 C700,32 800,78 900,55 C1000,32 1100,78 1200,55"></path>
-      <path id="wave-thin" d="M0,55 C100,32 200,78 300,55 C400,32 500,78 600,55 C700,32 800,78 900,55 C1000,32 1100,78 1200,55"></path>
+    <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
+      <path id="wave-shadow" d="M0,50 C100,32 200,68 300,50 C400,32 500,68 600,50 C700,32 800,68 900,50 C1000,32 1100,68 1200,50"></path>
+      <path id="wave-highlight" d="M0,50 C100,32 200,68 300,50 C400,32 500,68 600,50 C700,32 800,68 900,50 C1000,32 1100,68 1200,50"></path>
+      <path id="wave-thin" d="M0,50 C100,32 200,68 300,50 C400,32 500,68 600,50 C700,32 800,68 900,50 C1000,32 1100,68 1200,50"></path>
     </svg>
   </div>
 
   <div id="water-depth-guide" aria-hidden="true"></div>
   <div id="fixed-badge">水面高さ 固定中</div>
+  <div id="toast" role="status" aria-live="polite">水面高さを固定しました</div>
 
   <main id="ui-panel">
-    <div id="title">WebAR 浸水シミュレーション MVP v2.3</div>
+    <div id="title">WebAR 浸水深シミュレーション v2.5</div>
     <div id="status">カメラ開始を押してください。
-Chromeで映れば、第1段階は成功です。</div>
+この版はマーカーなしで、手動で水面位置を合わせる正式版です。</div>
 
     <div id="buttons">
-      <button id="start-camera" type="button">カメラ開始</button>
-      <button id="toggle-water" type="button">水表現ON/OFF</button>
+      <button id="start-camera" class="primary" type="button">カメラ開始</button>
       <button id="fix-height" class="fixed" type="button">この高さに固定</button>
+      <button id="experience-mode" class="mode" type="button">体験開始</button>
+      <button id="toggle-water" type="button">水表現ON/OFF</button>
       <button id="reset-height" type="button">高さ初期化</button>
       <button id="compact-ui" type="button">UI小さく</button>
       <button id="hide-ui" type="button">UI非表示</button>
@@ -445,25 +468,25 @@ Chromeで映れば、第1段階は成功です。</div>
 
     <div id="effect-controls">
       <label for="water-density-slider">水の濃さ</label>
-      <input id="water-density-slider" type="range" min="35" max="100" step="5" value="100" />
+      <input id="water-density-slider" type="range" min="35" max="100" step="5" value="88" />
 
       <label for="wave-strength-slider">波の強さ</label>
-      <input id="wave-strength-slider" type="range" min="3" max="18" step="1" value="11" />
+      <input id="wave-strength-slider" type="range" min="3" max="18" step="1" value="9" />
     </div>
 
     <details id="help">
       <summary>使い方・確認ポイント</summary>
       <ol>
-        <li>スマホのChromeまたはSafariでHTTPSのGitHub Pages URLを開きます。</li>
         <li>「カメラ開始」を押し、カメラを許可します。</li>
-        <li>水面ラインを浸水高さ標識の波マークに合わせます。</li>
+        <li>浸水高さ標識や壁・地面を見ながら、水面ラインを合わせます。</li>
         <li>「この高さに固定」を押すと、現在の水面位置を保存します。</li>
-        <li>このv2ではMindAR/Three.jsは使っていません。黒画面回避を優先した手動高さ固定版です。</li>
+        <li>「体験開始」を押すと、操作パネルを隠して体験表示にします。</li>
+        <li>右下の「操作」ボタンでパネルを戻せます。</li>
       </ol>
     </details>
 
     <div id="notice">
-      ※ この版は第2段階の安全版です。まず「カメラ＋水表現＋手動高さ固定」を安定させます。
+      ※ v2.5はマーカーなし正式版です。MindAR/Three.jsは使わず、安定したカメラ表示と手動高さ合わせを優先しています。
     </div>
   </main>
 
@@ -476,6 +499,7 @@ Chromeで映れば、第1段階は成功です。</div>
     const stopCameraButton = document.getElementById("stop-camera");
     const toggleWaterButton = document.getElementById("toggle-water");
     const fixHeightButton = document.getElementById("fix-height");
+    const experienceModeButton = document.getElementById("experience-mode");
     const resetHeightButton = document.getElementById("reset-height");
     const waterUpButton = document.getElementById("water-up");
     const waterDownButton = document.getElementById("water-down");
@@ -489,17 +513,20 @@ Chromeで映れば、第1段階は成功です。</div>
     const waveShadow = document.getElementById("wave-shadow");
     const waveHighlight = document.getElementById("wave-highlight");
     const waveThin = document.getElementById("wave-thin");
+    const toast = document.getElementById("toast");
 
-    const STORAGE_KEY = "webarFloodStableMvpV23";
+    const STORAGE_KEY = "webarFloodDepthNoMarkerV25";
+
     let stream = null;
     let waterVisible = true;
     let waterPercent = 55;
     let waterFixed = false;
     let uiCompact = false;
     let uiHidden = false;
-    let waterDensity = 100;
-    let waveStrength = 11;
+    let waterDensity = 88;
+    let waveStrength = 9;
     let autoHideTimer = null;
+    let toastTimer = null;
     let waveStarted = false;
 
     loadState();
@@ -507,7 +534,7 @@ Chromeで映れば、第1段階は成功です。</div>
     updateWaterVisibility();
     applyUIState();
     applyEffectSettings();
-    updateStatus("カメラ開始を押してください。\nChromeで映れば、第1段階は成功です。");
+    updateStatus("カメラ開始を押してください。\nこの版はマーカーなしで、手動で水面位置を合わせる正式版です。");
 
     function updateStatus(text) {
       statusEl.textContent = text;
@@ -517,19 +544,24 @@ Chromeで映れば、第1段階は成功です。</div>
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
+
         const state = JSON.parse(raw);
+
         if (Number.isFinite(state.waterPercent)) {
           waterPercent = clamp(state.waterPercent, 15, 88);
           heightSlider.value = String(waterPercent);
         }
+
         waterVisible = state.waterVisible !== false;
         waterFixed = !!state.waterFixed;
         uiCompact = !!state.uiCompact;
         uiHidden = false;
+
         if (Number.isFinite(state.waterDensity)) {
           waterDensity = clamp(state.waterDensity, 35, 100);
           waterDensitySlider.value = String(waterDensity);
         }
+
         if (Number.isFinite(state.waveStrength)) {
           waveStrength = clamp(state.waveStrength, 3, 18);
           waveStrengthSlider.value = String(waveStrength);
@@ -571,7 +603,7 @@ Chromeで映れば、第1段階は成功です。</div>
 
         stopCamera();
 
-        const constraints = {
+        const streamConstraints = {
           video: {
             facingMode: { ideal: "environment" },
             width: { ideal: 1280 },
@@ -580,7 +612,7 @@ Chromeで映れば、第1段階は成功です。</div>
           audio: false
         };
 
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia(streamConstraints);
 
         video.srcObject = stream;
         video.setAttribute("playsinline", "true");
@@ -597,7 +629,7 @@ Chromeで映れば、第1段階は成功です。</div>
 
         updateStatus(
           "カメラ映像を取得しました。\n" +
-          "映像が見えていれば、第2段階の土台は成功です。\n\n" +
+          "水面位置を調整して「この高さに固定」を押してください。\n\n" +
           getVideoDebugText()
         );
       } catch (error) {
@@ -696,13 +728,23 @@ Chromeで映れば、第1段階は成功です。</div>
 
     function applyEffectSettings() {
       const waterOpacity = waterDensity / 100;
-      const causticsOpacity = 0.10 + (waterDensity / 100) * 0.18;
+      const causticsOpacity = 0.08 + (waterDensity / 100) * 0.16;
 
       document.documentElement.style.setProperty("--water-opacity", String(waterOpacity));
       document.documentElement.style.setProperty("--caustics-opacity", String(causticsOpacity.toFixed(2)));
 
       waterDensitySlider.value = String(waterDensity);
       waveStrengthSlider.value = String(waveStrength);
+    }
+
+    function showToast(message, duration = 2000) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.classList.add("show");
+
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, duration);
     }
 
     function scheduleAutoHideAfterFix() {
@@ -721,6 +763,12 @@ Chromeで映れば、第1段階は成功です。</div>
       }, 3000);
     }
 
+    function enterExperienceMode() {
+      uiCompact = true;
+      uiHidden = true;
+      applyUIState();
+      showToast("体験表示に切り替えました", 1600);
+    }
 
     function fixHeight() {
       waterFixed = !waterFixed;
@@ -728,16 +776,20 @@ Chromeで映れば、第1段階は成功です。</div>
       fixHeightButton.textContent = waterFixed ? "固定解除" : "この高さに固定";
       saveState();
 
-      updateStatus(
-        (waterFixed ? "水面高さを固定しました。3秒後に操作パネルを非表示にします。" : "水面高さの固定を解除しました。") +
-        "\n現在の水面位置: " + waterPercent + "%\n\n" +
-        getVideoDebugText()
-      );
-
       if (waterFixed) {
+        showToast("水面高さを固定しました", 2000);
+        updateStatus(
+          "水面高さを固定しました。3秒後に操作パネルを非表示にします。\n" +
+          "現在の水面位置: " + waterPercent + "%\n\n" +
+          getVideoDebugText()
+        );
         scheduleAutoHideAfterFix();
       } else {
         clearTimeout(autoHideTimer);
+        showToast("水面高さの固定を解除しました", 1600);
+        updateStatus(
+          "水面高さの固定を解除しました。\n現在の水面位置: " + waterPercent + "%"
+        );
       }
     }
 
@@ -757,8 +809,8 @@ Chromeで映れば、第1段階は成功です。</div>
 
     function animateWave(time) {
       const t = time * 0.001;
-      const d1 = buildWavePath(1200, 110, waveStrength, t, 1.35);
-      const d2 = buildWavePath(1200, 110, Math.max(3, waveStrength * 0.62), t + 1.3, 1.1);
+      const d1 = buildWavePath(1200, 100, waveStrength, t, 1.28);
+      const d2 = buildWavePath(1200, 100, Math.max(3, waveStrength * 0.56), t + 1.3, 1.05);
 
       waveShadow.setAttribute("d", d1);
       waveHighlight.setAttribute("d", d1);
@@ -800,12 +852,12 @@ Chromeで映れば、第1段階は成功です。</div>
       updateStatus("水表現: " + (waterVisible ? "ON" : "OFF"));
     });
 
+    fixHeightButton.addEventListener("click", fixHeight);
+    experienceModeButton.addEventListener("click", enterExperienceMode);
+    resetHeightButton.addEventListener("click", resetHeight);
     compactUiButton.addEventListener("click", toggleCompactUI);
     hideUiButton.addEventListener("click", hideUI);
     showPanelButton.addEventListener("click", showUI);
-
-    fixHeightButton.addEventListener("click", fixHeight);
-    resetHeightButton.addEventListener("click", resetHeight);
 
     waterUpButton.addEventListener("click", () => {
       setWaterPercent(waterPercent - 2);
