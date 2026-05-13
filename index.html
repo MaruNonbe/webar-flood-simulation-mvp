@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>WebAR 浸水深シミュレーション v2.5</title>
+  <title>WebAR 浸水深シミュレーション v2.6 多言語版</title>
 
   <style>
     :root {
@@ -212,6 +212,32 @@
       margin-bottom: 12px;
     }
 
+
+
+    #language-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    #language-label {
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0.9;
+    }
+
+    #language-select {
+      min-height: 38px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.35);
+      padding: 7px 12px;
+      font-weight: 800;
+      color: #073247;
+      background: rgba(239,252,255,0.96);
+    }
+
     #buttons {
       display: flex;
       gap: 8px;
@@ -332,6 +358,7 @@
     }
 
     body.ui-compact #status,
+    body.ui-compact #language-row,
     body.ui-compact #help,
     body.ui-compact #notice,
     body.ui-compact #effect-controls {
@@ -443,9 +470,20 @@
   <div id="toast" role="status" aria-live="polite">水面高さを固定しました</div>
 
   <main id="ui-panel">
-    <div id="title">WebAR 浸水深シミュレーション v2.5</div>
+    <div id="title">WebAR 浸水深シミュレーション v2.6 多言語版</div>
     <div id="status">カメラ開始を押してください。
-この版はマーカーなしで、手動で水面位置を合わせる正式版です。</div>
+この版はマーカーなしで、手動で水面位置を合わせる多言語版です。</div>
+
+    <div id="language-row">
+      <span id="language-label">言語</span>
+      <select id="language-select" aria-label="Language">
+        <option value="ja">日本語</option>
+        <option value="easy">やさしい日本語</option>
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+        <option value="ko">한국어</option>
+      </select>
+    </div>
 
     <div id="buttons">
       <button id="start-camera" class="primary" type="button">カメラ開始</button>
@@ -467,16 +505,16 @@
     <div id="height-label">水面位置: 55%</div>
 
     <div id="effect-controls">
-      <label for="water-density-slider">水の濃さ</label>
+      <label id="water-density-label" for="water-density-slider">水の濃さ</label>
       <input id="water-density-slider" type="range" min="35" max="100" step="5" value="88" />
 
-      <label for="wave-strength-slider">波の強さ</label>
+      <label id="wave-strength-label" for="wave-strength-slider">波の強さ</label>
       <input id="wave-strength-slider" type="range" min="3" max="18" step="1" value="9" />
     </div>
 
     <details id="help">
-      <summary>使い方・確認ポイント</summary>
-      <ol>
+      <summary id="help-summary">使い方・確認ポイント</summary>
+      <ol id="help-list">
         <li>「カメラ開始」を押し、カメラを許可します。</li>
         <li>浸水高さ標識や壁・地面を見ながら、水面ラインを合わせます。</li>
         <li>「この高さに固定」を押すと、現在の水面位置を保存します。</li>
@@ -486,15 +524,291 @@
     </details>
 
     <div id="notice">
-      ※ v2.5はマーカーなし正式版です。MindAR/Three.jsは使わず、安定したカメラ表示と手動高さ合わせを優先しています。
+      ※ v2.6はマーカーなし多言語版です。安定したカメラ表示と手動高さ合わせを優先しています。
     </div>
   </main>
 
   <button id="show-panel-button" type="button">操作</button>
 
   <script>
+    const I18N = {
+      "ja": {
+            "appTitle": "WebAR 浸水深シミュレーション v2.6",
+            "languageLabel": "言語",
+            "statusInitial": "カメラ開始を押してください。\nこの版はマーカーなしで、手動で水面位置を合わせる多言語版です。",
+            "startCamera": "カメラ開始",
+            "fixHeight": "この高さに固定",
+            "unfixHeight": "固定解除",
+            "experienceMode": "体験開始",
+            "toggleWater": "水表現ON/OFF",
+            "resetHeight": "高さ初期化",
+            "compactUI": "UI小さく",
+            "normalUI": "UI戻す",
+            "hideUI": "UI非表示",
+            "stopCamera": "カメラ停止",
+            "waterUp": "水面↑",
+            "waterDown": "水面↓",
+            "showPanel": "操作",
+            "waterDensity": "水の濃さ",
+            "waveStrength": "波の強さ",
+            "helpSummary": "使い方・確認ポイント",
+            "helpItems": [
+                  "「カメラ開始」を押し、カメラを許可します。",
+                  "浸水高さ標識や壁・地面を見ながら、水面ラインを合わせます。",
+                  "「この高さに固定」を押すと、現在の水面位置を保存します。",
+                  "「体験開始」を押すと、操作パネルを隠して体験表示にします。",
+                  "右下の「操作」ボタンでパネルを戻せます。"
+            ],
+            "notice": "※ v2.6はマーカーなし多言語版です。安定したカメラ表示と手動高さ合わせを優先しています。",
+            "fixedBadge": "水面高さ 固定中",
+            "toastFixed": "水面高さを固定しました",
+            "toastUnfixed": "水面高さの固定を解除しました",
+            "toastExperience": "体験表示に切り替えました",
+            "cameraStarting": "カメラ起動中です。許可を求められたら許可してください。",
+            "cameraStarted": "カメラ映像を取得しました。\n水面位置を調整して「この高さに固定」を押してください。",
+            "cameraFailed": "カメラ起動に失敗しました。",
+            "cameraStopped": "カメラを停止しました。",
+            "waterOn": "水表現: ON",
+            "waterOff": "水表現: OFF",
+            "fixedStatus": "水面高さを固定しました。3秒後に操作パネルを非表示にします。",
+            "unfixedStatus": "水面高さの固定を解除しました。",
+            "resetStatus": "水面高さを初期化しました。",
+            "upStatus": "水面を上げました。",
+            "downStatus": "水面を下げました。",
+            "currentWater": "現在の水面位置",
+            "waterLabel": "水面位置",
+            "isFixed": "水面固定",
+            "yes": "ON",
+            "no": "OFF",
+            "errorHttps": "HTTPSではありません。GitHub PagesなどHTTPSのURLで開いてください。",
+            "errorNotSupported": "このブラウザは getUserMedia に対応していません。",
+            "errorNotAllowed": "カメラ許可が拒否されています。\nブラウザのサイト設定でカメラを許可してください。",
+            "errorNotFound": "カメラが見つかりません。\n別ブラウザまたは端末で確認してください。",
+            "errorNotReadable": "カメラを読み取れません。\n他のアプリがカメラを使用していないか確認してください。"
+      },
+      "easy": {
+            "appTitle": "スマホで見る 浸水の高さ v2.6",
+            "languageLabel": "ことば",
+            "statusInitial": "「カメラ開始」をおしてください。\n水の高さを、手で合わせて見るページです。",
+            "startCamera": "カメラ開始",
+            "fixHeight": "この高さで決める",
+            "unfixHeight": "やり直す",
+            "experienceMode": "見る画面にする",
+            "toggleWater": "水を表示/消す",
+            "resetHeight": "高さを戻す",
+            "compactUI": "ボタンを小さく",
+            "normalUI": "元にもどす",
+            "hideUI": "ボタンをかくす",
+            "stopCamera": "カメラ停止",
+            "waterUp": "水を上へ",
+            "waterDown": "水を下へ",
+            "showPanel": "操作",
+            "waterDensity": "水のこさ",
+            "waveStrength": "波の大きさ",
+            "helpSummary": "使い方",
+            "helpItems": [
+                  "「カメラ開始」をおして、カメラを使うことを許可します。",
+                  "標識や建物を見ながら、水の線を合わせます。",
+                  "「この高さで決める」をおします。",
+                  "「見る画面にする」をおすと、ボタンがかくれます。",
+                  "右下の「操作」で、ボタンをまた出せます。"
+            ],
+            "notice": "※ これは防災を学ぶための表示です。実際の災害では、市町村などの正しい情報を見てください。",
+            "fixedBadge": "水の高さ 決定中",
+            "toastFixed": "水の高さを決めました",
+            "toastUnfixed": "水の高さをやり直します",
+            "toastExperience": "見る画面にしました",
+            "cameraStarting": "カメラを起動しています。許可してください。",
+            "cameraStarted": "カメラが映りました。\n水の高さを合わせて「この高さで決める」をおしてください。",
+            "cameraFailed": "カメラを起動できませんでした。",
+            "cameraStopped": "カメラを止めました。",
+            "waterOn": "水の表示: ON",
+            "waterOff": "水の表示: OFF",
+            "fixedStatus": "水の高さを決めました。3秒後にボタンをかくします。",
+            "unfixedStatus": "水の高さをやり直します。",
+            "resetStatus": "水の高さを元にもどしました。",
+            "upStatus": "水を上げました。",
+            "downStatus": "水を下げました。",
+            "currentWater": "今の水の高さ",
+            "waterLabel": "水の高さ",
+            "isFixed": "高さ決定",
+            "yes": "はい",
+            "no": "いいえ",
+            "errorHttps": "HTTPSのページで開いてください。",
+            "errorNotSupported": "このブラウザではカメラを使えません。",
+            "errorNotAllowed": "カメラが許可されていません。ブラウザの設定で許可してください。",
+            "errorNotFound": "カメラが見つかりません。",
+            "errorNotReadable": "カメラを使えません。他のアプリが使っていないか確認してください。"
+      },
+      "en": {
+            "appTitle": "WebAR Flood Depth Simulation v2.6",
+            "languageLabel": "Language",
+            "statusInitial": "Tap Start Camera.\nThis multilingual version uses manual water-level alignment without markers.",
+            "startCamera": "Start Camera",
+            "fixHeight": "Fix This Level",
+            "unfixHeight": "Unlock Level",
+            "experienceMode": "Experience Mode",
+            "toggleWater": "Water ON/OFF",
+            "resetHeight": "Reset Level",
+            "compactUI": "Compact UI",
+            "normalUI": "Restore UI",
+            "hideUI": "Hide UI",
+            "stopCamera": "Stop Camera",
+            "waterUp": "Water ↑",
+            "waterDown": "Water ↓",
+            "showPanel": "Controls",
+            "waterDensity": "Water density",
+            "waveStrength": "Wave strength",
+            "helpSummary": "How to use",
+            "helpItems": [
+                  "Tap Start Camera and allow camera access.",
+                  "Align the water line with the flood depth sign or target height.",
+                  "Tap Fix This Level to save the current water level.",
+                  "Tap Experience Mode to hide the control panel.",
+                  "Tap Controls at the bottom right to show the panel again."
+            ],
+            "notice": "Note: This is a multilingual no-marker version. It prioritizes stable camera display and manual alignment.",
+            "fixedBadge": "Water level fixed",
+            "toastFixed": "Water level fixed",
+            "toastUnfixed": "Water level unlocked",
+            "toastExperience": "Switched to experience mode",
+            "cameraStarting": "Starting camera. Please allow camera access.",
+            "cameraStarted": "Camera started.\nAdjust the water line and tap Fix This Level.",
+            "cameraFailed": "Failed to start camera.",
+            "cameraStopped": "Camera stopped.",
+            "waterOn": "Water display: ON",
+            "waterOff": "Water display: OFF",
+            "fixedStatus": "Water level fixed. The control panel will hide in 3 seconds.",
+            "unfixedStatus": "Water level unlocked.",
+            "resetStatus": "Water level reset.",
+            "upStatus": "Water line moved up.",
+            "downStatus": "Water line moved down.",
+            "currentWater": "Current water level",
+            "waterLabel": "Water level",
+            "isFixed": "Fixed",
+            "yes": "ON",
+            "no": "OFF",
+            "errorHttps": "This page is not HTTPS. Please open it with an HTTPS URL such as GitHub Pages.",
+            "errorNotSupported": "This browser does not support getUserMedia.",
+            "errorNotAllowed": "Camera permission was denied. Please allow camera access in browser settings.",
+            "errorNotFound": "No camera was found. Please try another browser or device.",
+            "errorNotReadable": "The camera cannot be read. Please check if another app is using it."
+      },
+      "zh": {
+            "appTitle": "WebAR 浸水深度模拟 v2.6",
+            "languageLabel": "语言",
+            "statusInitial": "请点击“启动摄像头”。\n这是无标记、多语言版本，可手动调整水位线。",
+            "startCamera": "启动摄像头",
+            "fixHeight": "固定此高度",
+            "unfixHeight": "解除固定",
+            "experienceMode": "体验模式",
+            "toggleWater": "水面 开/关",
+            "resetHeight": "重置高度",
+            "compactUI": "缩小界面",
+            "normalUI": "恢复界面",
+            "hideUI": "隐藏界面",
+            "stopCamera": "停止摄像头",
+            "waterUp": "水面↑",
+            "waterDown": "水面↓",
+            "showPanel": "操作",
+            "waterDensity": "水色浓度",
+            "waveStrength": "波浪强度",
+            "helpSummary": "使用方法",
+            "helpItems": [
+                  "点击“启动摄像头”，并允许使用摄像头。",
+                  "将水面线对准浸水深度标识或目标高度。",
+                  "点击“固定此高度”保存当前水位。",
+                  "点击“体验模式”隐藏操作面板。",
+                  "点击右下角“操作”按钮可恢复面板。"
+            ],
+            "notice": "※ 这是无标记多语言版本。优先保证摄像头显示和手动对齐的稳定性。",
+            "fixedBadge": "水位已固定",
+            "toastFixed": "水位已固定",
+            "toastUnfixed": "已解除水位固定",
+            "toastExperience": "已切换到体验模式",
+            "cameraStarting": "正在启动摄像头，请允许访问。",
+            "cameraStarted": "摄像头已启动。\n请调整水面线，然后点击“固定此高度”。",
+            "cameraFailed": "摄像头启动失败。",
+            "cameraStopped": "摄像头已停止。",
+            "waterOn": "水面显示: ON",
+            "waterOff": "水面显示: OFF",
+            "fixedStatus": "水位已固定。3秒后将隐藏操作面板。",
+            "unfixedStatus": "已解除水位固定。",
+            "resetStatus": "水位已重置。",
+            "upStatus": "水面线上移。",
+            "downStatus": "水面线下移。",
+            "currentWater": "当前水位",
+            "waterLabel": "水位",
+            "isFixed": "固定",
+            "yes": "ON",
+            "no": "OFF",
+            "errorHttps": "此页面不是 HTTPS。请使用 GitHub Pages 等 HTTPS 地址打开。",
+            "errorNotSupported": "此浏览器不支持 getUserMedia。",
+            "errorNotAllowed": "摄像头权限被拒绝。请在浏览器设置中允许摄像头。",
+            "errorNotFound": "未找到摄像头。请尝试其他浏览器或设备。",
+            "errorNotReadable": "无法读取摄像头。请确认是否有其他应用正在使用摄像头。"
+      },
+      "ko": {
+            "appTitle": "WebAR 침수 깊이 시뮬레이션 v2.6",
+            "languageLabel": "언어",
+            "statusInitial": "카메라 시작을 누르세요.\n이 버전은 마커 없이 수면 높이를 수동으로 맞추는 다국어 버전입니다.",
+            "startCamera": "카메라 시작",
+            "fixHeight": "이 높이로 고정",
+            "unfixHeight": "고정 해제",
+            "experienceMode": "체험 모드",
+            "toggleWater": "물 표시 ON/OFF",
+            "resetHeight": "높이 초기화",
+            "compactUI": "UI 작게",
+            "normalUI": "UI 복원",
+            "hideUI": "UI 숨기기",
+            "stopCamera": "카메라 정지",
+            "waterUp": "수면↑",
+            "waterDown": "수면↓",
+            "showPanel": "조작",
+            "waterDensity": "물 색 농도",
+            "waveStrength": "파도 강도",
+            "helpSummary": "사용 방법",
+            "helpItems": [
+                  "카메라 시작을 누르고 카메라 접근을 허용합니다.",
+                  "침수 깊이 표지나 목표 높이에 수면선을 맞춥니다.",
+                  "이 높이로 고정을 누르면 현재 수면 높이가 저장됩니다.",
+                  "체험 모드를 누르면 조작 패널이 숨겨집니다.",
+                  "오른쪽 아래 조작 버튼으로 패널을 다시 표시할 수 있습니다."
+            ],
+            "notice": "※ v2.6은 마커 없는 다국어 버전입니다. 안정적인 카메라 표시와 수동 맞춤을 우선합니다.",
+            "fixedBadge": "수면 높이 고정 중",
+            "toastFixed": "수면 높이를 고정했습니다",
+            "toastUnfixed": "수면 높이 고정을 해제했습니다",
+            "toastExperience": "체험 모드로 전환했습니다",
+            "cameraStarting": "카메라를 시작합니다. 권한을 허용해 주세요.",
+            "cameraStarted": "카메라가 시작되었습니다.\n수면선을 조정하고 이 높이로 고정을 누르세요.",
+            "cameraFailed": "카메라 시작에 실패했습니다.",
+            "cameraStopped": "카메라를 정지했습니다.",
+            "waterOn": "물 표시: ON",
+            "waterOff": "물 표시: OFF",
+            "fixedStatus": "수면 높이를 고정했습니다. 3초 후 조작 패널이 숨겨집니다.",
+            "unfixedStatus": "수면 높이 고정을 해제했습니다.",
+            "resetStatus": "수면 높이를 초기화했습니다.",
+            "upStatus": "수면선을 올렸습니다.",
+            "downStatus": "수면선을 내렸습니다.",
+            "currentWater": "현재 수면 위치",
+            "waterLabel": "수면 위치",
+            "isFixed": "고정",
+            "yes": "ON",
+            "no": "OFF",
+            "errorHttps": "HTTPS 페이지가 아닙니다. GitHub Pages와 같은 HTTPS URL로 열어 주세요.",
+            "errorNotSupported": "이 브라우저는 getUserMedia를 지원하지 않습니다.",
+            "errorNotAllowed": "카메라 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.",
+            "errorNotFound": "카메라를 찾을 수 없습니다. 다른 브라우저나 기기를 사용해 주세요.",
+            "errorNotReadable": "카메라를 읽을 수 없습니다. 다른 앱이 카메라를 사용 중인지 확인해 주세요."
+      }
+};
+
     const video = document.getElementById("camera");
     const statusEl = document.getElementById("status");
+    const languageSelect = document.getElementById("language-select");
+    const languageLabel = document.getElementById("language-label");
+    const titleEl = document.getElementById("title");
     const startCameraButton = document.getElementById("start-camera");
     const stopCameraButton = document.getElementById("stop-camera");
     const toggleWaterButton = document.getElementById("toggle-water");
@@ -510,12 +824,18 @@
     const waterDensitySlider = document.getElementById("water-density-slider");
     const waveStrengthSlider = document.getElementById("wave-strength-slider");
     const heightLabel = document.getElementById("height-label");
+    const waterDensityLabel = document.getElementById("water-density-label");
+    const waveStrengthLabel = document.getElementById("wave-strength-label");
+    const fixedBadge = document.getElementById("fixed-badge");
+    const helpSummary = document.getElementById("help-summary");
+    const helpList = document.getElementById("help-list");
+    const noticeEl = document.getElementById("notice");
     const waveShadow = document.getElementById("wave-shadow");
     const waveHighlight = document.getElementById("wave-highlight");
     const waveThin = document.getElementById("wave-thin");
     const toast = document.getElementById("toast");
 
-    const STORAGE_KEY = "webarFloodDepthNoMarkerV25";
+    const STORAGE_KEY = "webarFloodDepthNoMarkerV26";
 
     let stream = null;
     let waterVisible = true;
@@ -525,6 +845,7 @@
     let uiHidden = false;
     let waterDensity = 88;
     let waveStrength = 9;
+    let currentLang = "ja";
     let autoHideTimer = null;
     let toastTimer = null;
     let waveStarted = false;
@@ -540,12 +861,53 @@
       statusEl.textContent = text;
     }
 
+    function tr(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.ja[key] || key;
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang === "easy" ? "ja" : currentLang;
+      document.title = tr("appTitle");
+      titleEl.textContent = tr("appTitle");
+      languageLabel.textContent = tr("languageLabel");
+      languageSelect.value = currentLang;
+      startCameraButton.textContent = tr("startCamera");
+      fixHeightButton.textContent = waterFixed ? tr("unfixHeight") : tr("fixHeight");
+      experienceModeButton.textContent = tr("experienceMode");
+      toggleWaterButton.textContent = tr("toggleWater");
+      resetHeightButton.textContent = tr("resetHeight");
+      compactUiButton.textContent = uiCompact ? tr("normalUI") : tr("compactUI");
+      hideUiButton.textContent = tr("hideUI");
+      stopCameraButton.textContent = tr("stopCamera");
+      waterUpButton.textContent = tr("waterUp");
+      waterDownButton.textContent = tr("waterDown");
+      showPanelButton.textContent = tr("showPanel");
+      waterDensityLabel.textContent = tr("waterDensity");
+      waveStrengthLabel.textContent = tr("waveStrength");
+      fixedBadge.textContent = tr("fixedBadge");
+      helpSummary.textContent = tr("helpSummary");
+      noticeEl.textContent = tr("notice");
+      helpList.innerHTML = "";
+      tr("helpItems").forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        helpList.appendChild(li);
+      });
+      applyWaterLevel();
+      applyUIState();
+    }
+
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
 
         const state = JSON.parse(raw);
+
+        if (state.lang && I18N[state.lang]) {
+          currentLang = state.lang;
+          languageSelect.value = currentLang;
+        }
 
         if (Number.isFinite(state.waterPercent)) {
           waterPercent = clamp(state.waterPercent, 15, 88);
@@ -576,6 +938,7 @@
         localStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({
+            lang: currentLang,
             waterPercent,
             waterVisible,
             waterFixed,
@@ -590,15 +953,15 @@
     }
 
     async function startCamera() {
-      updateStatus("カメラ起動中です。許可を求められたら許可してください。");
+      updateStatus(tr("cameraStarting"));
 
       try {
         if (!window.isSecureContext) {
-          throw new Error("HTTPSではありません。GitHub PagesなどHTTPSのURLで開いてください。");
+          throw new Error(tr("errorHttps"));
         }
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("このブラウザは getUserMedia に対応していません。");
+          throw new Error(tr("errorNotSupported"));
         }
 
         stopCamera();
@@ -682,7 +1045,7 @@
         "paused: " + video.paused,
         "srcObject: " + (video.srcObject ? "あり" : "なし"),
         "secureContext: " + (window.isSecureContext ? "OK" : "NG"),
-        "水面固定: " + (waterFixed ? "ON" : "OFF")
+        tr("isFixed") + ": " + (waterFixed ? tr("yes") : tr("no"))
       ].join("\n");
     }
 
@@ -695,7 +1058,7 @@
 
     function applyWaterLevel() {
       document.documentElement.style.setProperty("--water-top", waterPercent + "vh");
-      heightLabel.textContent = "水面位置: " + waterPercent + "%";
+      heightLabel.textContent = tr("waterLabel") + ": " + waterPercent + "%";
       document.body.classList.toggle("is-fixed", waterFixed);
     }
 
@@ -707,7 +1070,7 @@
     function applyUIState() {
       document.body.classList.toggle("ui-compact", uiCompact);
       document.body.classList.toggle("ui-hidden", uiHidden);
-      compactUiButton.textContent = uiCompact ? "UI戻す" : "UI小さく";
+      compactUiButton.textContent = uiCompact ? tr("normalUI") : tr("compactUI");
     }
 
     function toggleCompactUI() {
@@ -767,17 +1130,17 @@
       uiCompact = true;
       uiHidden = true;
       applyUIState();
-      showToast("体験表示に切り替えました", 1600);
+      showToast(tr("toastExperience"), 1600);
     }
 
     function fixHeight() {
       waterFixed = !waterFixed;
       document.body.classList.toggle("is-fixed", waterFixed);
-      fixHeightButton.textContent = waterFixed ? "固定解除" : "この高さに固定";
+      fixHeightButton.textContent = waterFixed ? tr("unfixHeight") : tr("fixHeight");
       saveState();
 
       if (waterFixed) {
-        showToast("水面高さを固定しました", 2000);
+        showToast(tr("toastFixed"), 2000);
         updateStatus(
           "水面高さを固定しました。3秒後に操作パネルを非表示にします。\n" +
           "現在の水面位置: " + waterPercent + "%\n\n" +
@@ -786,7 +1149,7 @@
         scheduleAutoHideAfterFix();
       } else {
         clearTimeout(autoHideTimer);
-        showToast("水面高さの固定を解除しました", 1600);
+        showToast(tr("toastUnfixed"), 1600);
         updateStatus(
           "水面高さの固定を解除しました。\n現在の水面位置: " + waterPercent + "%"
         );
@@ -799,7 +1162,7 @@
       uiHidden = false;
       clearTimeout(autoHideTimer);
       heightSlider.value = "55";
-      fixHeightButton.textContent = "この高さに固定";
+      fixHeightButton.textContent = tr("fixHeight");
       applyWaterLevel();
       applyUIState();
       saveState();
@@ -839,17 +1202,24 @@
       return Math.max(min, Math.min(max, value));
     }
 
+    languageSelect.addEventListener("change", () => {
+      currentLang = languageSelect.value;
+      applyLanguage();
+      saveState();
+      updateStatus(tr("statusInitial"));
+    });
+
     startCameraButton.addEventListener("click", startCamera);
 
     stopCameraButton.addEventListener("click", () => {
       stopCamera();
-      updateStatus("カメラを停止しました。");
+      updateStatus(tr("cameraStopped"));
     });
 
     toggleWaterButton.addEventListener("click", () => {
       waterVisible = !waterVisible;
       updateWaterVisibility();
-      updateStatus("水表現: " + (waterVisible ? "ON" : "OFF"));
+      updateStatus(waterVisible ? tr("waterOn") : tr("waterOff"));
     });
 
     fixHeightButton.addEventListener("click", fixHeight);
@@ -885,7 +1255,8 @@
       saveState();
     });
 
-    fixHeightButton.textContent = waterFixed ? "固定解除" : "この高さに固定";
+    fixHeightButton.textContent = waterFixed ? tr("unfixHeight") : tr("fixHeight");
+    applyLanguage();
     applyUIState();
   </script>
 </body>
