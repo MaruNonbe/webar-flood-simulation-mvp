@@ -1,188 +1,109 @@
-# WebAR 浸水シミュレーション MVP
+# WebAR 浸水シミュレーション MVP v2
 
-このMVPは、iPhone Safari / Android Chromeで黒画面になりにくい構成を優先した、浸水高さシミュレーションの第1段階です。
+## 概要
 
-## 方針
+この版は、過去に成功している **getUserMedia 直接カメラ表示方式** を使った安全版です。
 
-この版では、安定動作を優先するため、以下は使っていません。
+第2段階として、ARマーカー認識はまだ使わず、スマホのカメラ映像に以下を重ねます。
+
+- 水面ライン
+- 水面下の水色半透明フィルター
+- 水中の光の揺らぎ
+- 水面高さの手動調整
+- 「この高さに固定」ボタン
+
+## 使っていないもの
+
+黒画面や読み込み停止を避けるため、この版では以下を使っていません。
 
 - MindAR
 - AR.js
 - Three.js
 - flood-marker.mind
-- 画像ターゲット認識
+- 外部CDN
 - 3D水面Plane
-- 複雑なシェーダー
-
-まず、`navigator.mediaDevices.getUserMedia` でスマホのカメラ映像を直接 `video` 要素に表示します。
-その上に、以下の表現をHTML/CSS/SVG/JavaScriptだけで重ねます。
-
-- 波打つ水面ライン
-- 水面下の水色半透明フィルター
-- 水中の光の揺らぎ風オーバーレイ
-- 水面高さ調整UI
-- 水表現ON/OFF
+- 画像ターゲット認識
 
 ## ファイル構成
 
 ```text
-webar-flood-simulation-mvp/
+webar-flood-stable-mvp-v2/
 ├─ index.html
 └─ README.md
 ```
 
-## GitHub Pagesへのアップロード手順
+## GitHub Pagesへのアップロード
 
-1. GitHub Desktopでリポジトリを開きます。
-2. 既存の `index.html` を、このMVP版の `index.html` で上書きします。
-3. `README.md` も必要に応じて上書きします。
-4. GitHub Desktopの `Changes` に変更が出ていることを確認します。
-5. Summaryに以下のように入力します。
+1. GitHub Desktopで対象リポジトリを開く
+2. 既存の `index.html` をこの版の `index.html` で上書き
+3. `README.md` をこの版の `README.md` で上書き
+4. Summary に以下を入力
 
 ```text
-Replace with stable getUserMedia MVP
+Update to stable manual water height MVP v2
 ```
 
-6. `Commit to main` を押します。
-7. `Push origin` を押します。
-8. GitHub Pagesの公開URLを開きます。
+5. `Commit to main`
+6. `Push origin`
+
+## スマホでの確認
+
+GitHub PagesのURLを開きます。
 
 例：
 
 ```text
-https://marunonbe.github.io/webar-flood-simulation-mvp/
+https://marunonbe.github.io/webar-flood-stable-test/?v=2
 ```
 
-キャッシュが残る場合は、以下のようにURL末尾にパラメータを付けます。
+確認手順：
+
+1. Chrome または Safari で開く
+2. 「カメラ開始」を押す
+3. カメラを許可する
+4. カメラ映像が出ることを確認
+5. 水面ラインを標識の波マークに合わせる
+6. 「この高さに固定」を押す
+
+## 黒画面の場合
+
+まず Chrome で確認してください。
+
+表示ステータスで以下が出ればカメラ取得は成功です。
 
 ```text
-https://marunonbe.github.io/webar-flood-simulation-mvp/?v=stable1
+video要素: あり
+readyState: 4
+videoSize: 720 x 1280 など
+paused: false
+srcObject: あり
+secureContext: OK
 ```
 
-## スマホでの確認手順
+それでも黒い場合は以下を確認してください。
 
-1. iPhoneはSafari、AndroidはChromeでGitHub PagesのURLを開きます。
-2. 画面下にUIパネルが表示されることを確認します。
-3. `カメラ開始` を押します。
-4. カメラ使用を求められたら許可します。
-5. カメラ映像が表示されるか確認します。
-6. 水面ラインが少し波打つことを確認します。
-7. 水面ラインより下に水色の半透明フィルターがかかることを確認します。
-8. スライダーまたは `水面↑` / `水面↓` で水面位置を調整します。
-9. `水表現ON/OFF` で水表現が切り替わることを確認します。
+- GitHub PagesのHTTPS URLで開いているか
+- カメラ許可を拒否していないか
+- 古いURLキャッシュを読んでいないか
+- `?v=2` などを付けて再読み込みしたか
+- SafariでだめならChromeで試したか
 
-## HTTPSについて
+## 次の段階
 
-スマホブラウザでカメラを使うには、基本的にHTTPSが必要です。
-GitHub PagesはHTTPSで公開されるため、テストに向いています。
+このv2が安定したら、次は次のどちらかに進みます。
 
-NG例：
+### A案：手動方式の完成度を上げる
 
-```text
-http://example.com/
-```
+- 水表現をさらにリアルにする
+- 水面ラインをより自然にする
+- 水色の濃さ調整を追加
+- 説明パネルを非表示にするボタンを追加
+- 体験者向けUIに整える
 
-OK例：
+### B案：MindARを別ページに追加する
 
-```text
-https://marunonbe.github.io/webar-flood-simulation-mvp/
-```
+- `marker.html` など別ページで実験
+- 成功版の `index.html` は壊さない
+- マーカー認識が安定してから統合する
 
-## 黒画面になった場合の確認項目
-
-### 1. UIが表示されているか
-
-UIが表示されている場合、HTML/CSSは読み込めています。
-カメラ映像が黒い場合は、カメラ許可や端末側の問題を確認します。
-
-UIも表示されない場合は、以下を確認してください。
-
-- `index.html` が正しくアップロードされているか
-- GitHub Desktopで `Push origin` まで行ったか
-- GitHub PagesのURLを開いているか
-- GitHubのコード画面を開いていないか
-- Safari/Chromeのキャッシュが残っていないか
-
-### 2. GitHub PagesのURLで開いているか
-
-OK：
-
-```text
-https://marunonbe.github.io/webar-flood-simulation-mvp/
-```
-
-NG：
-
-```text
-https://github.com/MaruNonbe/webar-flood-simulation-mvp
-```
-
-### 3. HTTPSで開いているか
-
-カメラ起動にはHTTPSが必要です。
-`http://` ではカメラが使えない場合があります。
-
-### 4. カメラ許可
-
-iPhone Safariの場合：
-
-```text
-設定
-↓
-Safari
-↓
-カメラ
-↓
-確認 または 許可
-```
-
-または、Safariのアドレスバー周辺からWebサイト設定を開き、カメラ許可を確認します。
-
-Android Chromeの場合：
-
-```text
-アドレスバー左の鍵マーク
-↓
-サイトの設定
-↓
-カメラ
-↓
-許可
-```
-
-### 5. 他のアプリがカメラを使っていないか
-
-カメラアプリ、Zoom、LINE、Instagramなどがカメラを使用中の場合、ブラウザ側で映像取得に失敗することがあります。
-
-### 6. エラー名ごとの目安
-
-- `NotAllowedError`: カメラ許可が拒否されています。
-- `NotFoundError`: カメラが見つかりません。
-- `NotReadableError`: 他のアプリがカメラを使用している可能性があります。
-- HTTPSではないという表示: GitHub PagesなどのHTTPS URLで開いてください。
-
-## 第2段階でMindARを追加する場合
-
-第1段階で、iPhone/Androidともに以下が成功してからMindARを追加します。
-
-- カメラ映像が表示される
-- 水面ラインが表示される
-- 水面下に水色フィルターがかかる
-- 水面高さを手動調整できる
-
-その後の方針：
-
-1. 現在の `getUserMedia` 直接表示版をバックアップします。
-2. 別ブランチまたは別フォルダーでMindAR版を作ります。
-3. 浸水高さ標識の黒枠・波マーク・2.0m部分を画像ターゲット化します。
-4. `flood-marker.mind` を作成します。
-5. MindARでマーカー認識だけを先に確認します。
-6. マーカー認識成功後、現在の水面ライン位置をマーカー高さに連動させます。
-7. Three.jsの3D水面Planeは最後に追加します。
-
-## 開発上の注意
-
-第1段階では、安定性を優先します。
-黒画面や読み込み停止の原因を増やさないため、外部ライブラリは使用しません。
-
-まずは1ファイルの `index.html` で、スマホカメラが確実に映ることを確認してください。
+おすすめは **A案で手動方式を完成させてから、B案へ進む** ことです。
