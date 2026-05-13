@@ -149,3 +149,37 @@ ol {
   margin: 6px 0 0 20px;
   padding: 0;
 }
+
+/* MindAR camera/video/canvas visibility fix */
+#ar-container video,
+#ar-container canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  z-index: 1 !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#ar-container {
+  z-index: 0;
+}
+
+#ui-panel {
+  z-index: 100;
+}
+
+#underwater-overlay {
+  z-index: 20;
+}
+
+#caustics-overlay {
+  z-index: 21;
+}
+
+#water-line {
+  z-index: 22;
+}
