@@ -1,0 +1,4 @@
+実際の浸水高さ標識の波マーク画像から MindAR 用の flood-marker.mind を作成し、このフォルダに配置してください。
+
+必要な配置先:
+assets/targets/flood-marker.mind
