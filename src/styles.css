@@ -13,7 +13,43 @@ body {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background: #000;
+  background: transparent;
+  z-index: 0;
+}
+
+/* MindAR camera/video/canvas visibility fix */
+#ar-container video,
+#ar-container canvas,
+video,
+canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Camera video should be behind WebGL canvas */
+#ar-container video,
+video {
+  z-index: 1 !important;
+}
+
+/* Three.js canvas */
+#ar-container canvas,
+canvas {
+  z-index: 2 !important;
+}
+
+/* MindARが追加する可能性のある要素を画面全体にする */
+.mindar-ui-overlay,
+.mindar-ui-loading,
+.mindar-ui-scanning,
+.mindar-ui-error {
+  z-index: 90 !important;
 }
 
 #underwater-overlay {
@@ -23,7 +59,7 @@ body {
   bottom: 0;
   height: 0;
   opacity: 0;
-  z-index: 10;
+  z-index: 20;
   pointer-events: none;
   background:
     radial-gradient(circle at 28% 18%, rgba(220, 255, 255, 0.18), transparent 24%),
@@ -39,7 +75,7 @@ body {
   position: fixed;
   inset: 0;
   opacity: 0;
-  z-index: 11;
+  z-index: 21;
   pointer-events: none;
   background-image:
     repeating-radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.16) 0 1px, transparent 2px 24px),
@@ -57,7 +93,7 @@ body {
   top: 50vh;
   height: 48px;
   transform: translateY(-24px);
-  z-index: 12;
+  z-index: 22;
   pointer-events: none;
   opacity: 0;
   transition: opacity 320ms ease;
@@ -89,7 +125,7 @@ body {
   left: max(12px, env(safe-area-inset-left));
   right: max(12px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));
-  z-index: 30;
+  z-index: 100;
   color: white;
   background: rgba(0, 18, 32, 0.58);
   border: 1px solid rgba(255,255,255,0.18);
@@ -148,38 +184,4 @@ summary {
 ol {
   margin: 6px 0 0 20px;
   padding: 0;
-}
-
-/* MindAR camera/video/canvas visibility fix */
-#ar-container video,
-#ar-container canvas {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  z-index: 1 !important;
-  display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-#ar-container {
-  z-index: 0;
-}
-
-#ui-panel {
-  z-index: 100;
-}
-
-#underwater-overlay {
-  z-index: 20;
-}
-
-#caustics-overlay {
-  z-index: 21;
-}
-
-#water-line {
-  z-index: 22;
 }
