@@ -1,42 +1,300 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>WebAR 浸水シミュレーション MVP</title>
-  <link rel="stylesheet" href="./src/styles.css" />
-</head>
-<body>
-  <div id="ar-container"></div>
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import { MindARThree } from "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js";
 
-  <div id="underwater-overlay" aria-hidden="true"></div>
-  <div id="caustics-overlay" aria-hidden="true"></div>
+import { createWaterSurface, updateWaterSurface } from "./water.js";
+import { updateUnderwaterOverlay } from "./underwater-overlay.js";
+import {
+  createHeightSampler,
+  resetHeightSampler,
+  sampleMarkerHeight,
+} from "./marker-height-controller.js";
 
-  <div id="water-line" aria-hidden="true">
-    <svg viewBox="0 0 1200 96" preserveAspectRatio="none">
-      <path id="wave-path-back" d="M0,48 C100,26 200,70 300,48 C400,26 500,70 600,48 C700,26 800,70 900,48 C1000,26 1100,70 1200,48" />
-      <path id="wave-path-front" d="M0,48 C100,26 200,70 300,48 C400,26 500,70 600,48 C700,26 800,70 900,48 C1000,26 1100,70 1200,48" />
-    </svg>
-  </div>
+const TARGET_SRC = "./assets/targets/flood-marker.mind";
 
-  <div id="ui-panel">
-    <div id="title">WebAR 浸水シミュレーション</div>
-    <div id="status">ARを開始してください</div>
-    <div id="buttons">
-      <button id="start-button" type="button">ARを開始</button>
-      <button id="reset-button" type="button" disabled>水面高さを再設定</button>
-    </div>
-    <details>
-      <summary>使い方</summary>
-      <ol>
-        <li>HTTPS環境で開き、カメラを許可します。</li>
-        <li>浸水高さ標識の波マークを画面に映します。</li>
-        <li>約1秒間サンプリング後、その高さに水面を固定します。</li>
-        <li>再設定したい場合は「水面高さを再設定」を押します。</li>
-      </ol>
-    </details>
-  </div>
+const container = document.querySelector("#ar-container");
+const startButton = document.querySelector("#start-button");
+const resetButton = document.querySelector("#reset-button");
+const statusText = document.querySelector("#status");
 
-  <script type="module" src="./src/main.js"></script>
-</body>
-</html>
+let mindarThree = null;
+let renderer = null;
+let scene = null;
+let camera = null;
+let anchor = null;
+
+let water = null;
+let arStarted = false;
+let markerLocked = false;
+let waterHeightWorld = null;
+
+const clock = new THREE.Clock();
+let heightSampler = createHeightSampler();
+
+function setStatus(message) {
+  if (statusText) {
+    statusText.textContent = message;
+  }
+}
+
+function forceCameraVideoVisible() {
+  const videos = document.querySelectorAll("video");
+  const canvases = document.querySelectorAll("canvas");
+
+  videos.forEach((video, index) => {
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("webkit-playsinline", "true");
+    video.muted = true;
+
+    video.style.position = "absolute";
+    video.style.left = "0";
+    video.style.top = "0";
+    video.style.width = "100%";
+    video.style.height = "100%";
+    video.style.objectFit = "cover";
+    video.style.zIndex = "1";
+    video.style.opacity = "1";
+    video.style.visibility = "visible";
+    video.style.display = "block";
+    video.style.background = "transparent";
+
+    console.log("[AR VIDEO]", index, {
+      readyState: video.readyState,
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+      paused: video.paused,
+      srcObject: !!video.srcObject,
+    });
+  });
+
+  canvases.forEach((canvas, index) => {
+    canvas.style.position = "absolute";
+    canvas.style.left = "0";
+    canvas.style.top = "0";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.zIndex = "2";
+    canvas.style.background = "transparent";
+    canvas.style.opacity = "1";
+    canvas.style.visibility = "visible";
+    canvas.style.display = "block";
+
+    console.log("[AR CANVAS]", index, {
+      width: canvas.width,
+      height: canvas.height,
+    });
+  });
+}
+
+function getCameraDebugText() {
+  const video = document.querySelector("video");
+
+  if (!video) {
+    return "video要素: なし";
+  }
+
+  return [
+    "video要素: あり",
+    `readyState: ${video.readyState}`,
+    `videoSize: ${video.videoWidth} x ${video.videoHeight}`,
+    `paused: ${video.paused}`,
+    `srcObject: ${video.srcObject ? "あり" : "なし"}`,
+  ].join("\n");
+}
+
+async function startAR() {
+  if (arStarted) return;
+
+  if (!container) {
+    alert("ar-container が見つかりません。index.htmlを確認してください。");
+    return;
+  }
+
+  startButton.disabled = true;
+  setStatus("AR起動中です。カメラ許可を求められたら許可してください。");
+
+  try {
+    const targetCheck = await fetch(TARGET_SRC, { cache: "no-store" });
+
+    if (!targetCheck.ok) {
+      throw new Error(
+        `MindARターゲットが見つかりません。\n${TARGET_SRC}\nstatus=${targetCheck.status}`
+      );
+    }
+
+    mindarThree = new MindARThree({
+      container,
+      imageTargetSrc: TARGET_SRC,
+      maxTrack: 1,
+      filterMinCF: 0.0001,
+      filterBeta: 0.001,
+      uiScanning: "yes",
+      uiLoading: "yes",
+      uiError: "yes",
+    });
+
+    renderer = mindarThree.renderer;
+    scene = mindarThree.scene;
+    camera = mindarThree.camera;
+
+    // 黒いCanvasでカメラ映像を隠さないための設定
+    renderer.setClearColor(0x000000, 0);
+    renderer.autoClear = true;
+
+    if (renderer.domElement) {
+      renderer.domElement.style.background = "transparent";
+      renderer.domElement.style.position = "absolute";
+      renderer.domElement.style.left = "0";
+      renderer.domElement.style.top = "0";
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
+      renderer.domElement.style.zIndex = "2";
+      renderer.domElement.style.opacity = "1";
+    }
+
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x447788, 1.2);
+    scene.add(hemiLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.75);
+    directionalLight.position.set(1, 2, 1);
+    scene.add(directionalLight);
+
+    anchor = mindarThree.addAnchor(0);
+
+    anchor.onTargetFound = () => {
+      if (!markerLocked) {
+        setStatus("波マークを認識しました。水面高さを計測中です。");
+      } else {
+        setStatus("波マークを再認識しました。水面高さは保持中です。");
+      }
+    };
+
+    anchor.onTargetLost = () => {
+      if (markerLocked) {
+        setStatus("マーカーが画面外です。水面高さは保持しています。");
+      } else {
+        setStatus("波マークをカメラ中央に映してください。");
+      }
+    };
+
+    water = createWaterSurface();
+    water.visible = false;
+    scene.add(water);
+
+    await mindarThree.start();
+
+    arStarted = true;
+    resetButton.disabled = false;
+
+    // MindAR起動後に video / canvas の表示を強制調整
+    forceCameraVideoVisible();
+
+    setTimeout(() => {
+      forceCameraVideoVisible();
+      setStatus(
+        "ARを開始しました。\n" +
+          "浸水高さ標識の黒枠・波マーク・2.0m部分をカメラに映してください。\n\n" +
+          getCameraDebugText()
+      );
+    }, 800);
+
+    renderer.setAnimationLoop(renderLoop);
+  } catch (error) {
+    console.error(error);
+
+    setStatus(
+      "AR起動に失敗しました。\n" +
+        "確認してください：\n" +
+        "1. flood-marker.mind が assets/targets/ にあるか\n" +
+        "2. GitHub PagesのURLで開いているか\n" +
+        "3. Safari/Chromeでカメラ許可しているか\n\n" +
+        String(error.message || error)
+    );
+
+    startButton.disabled = false;
+  }
+}
+
+function renderLoop() {
+  const elapsed = clock.elapsedTime;
+
+  if (!renderer || !scene || !camera) return;
+
+  if (anchor && anchor.group && anchor.group.visible && !markerLocked) {
+    const markerWorldPosition = new THREE.Vector3();
+    anchor.group.getWorldPosition(markerWorldPosition);
+
+    const result = sampleMarkerHeight(heightSampler, markerWorldPosition.y);
+
+    setStatus(
+      `水面高さを計測中です。\nサンプル数: ${result.count}\n波マークをなるべく動かさず映してください。`
+    );
+
+    if (result.ready) {
+      waterHeightWorld = result.height;
+      markerLocked = true;
+
+      setStatus(
+        `水面高さを固定しました。\nY=${waterHeightWorld.toFixed(
+          3
+        )}\nマーカーが画面外になっても保持します。`
+      );
+    }
+  }
+
+  if (waterHeightWorld !== null && water) {
+    water.visible = true;
+
+    water.position.set(0, waterHeightWorld, -3);
+    water.rotation.x = -Math.PI / 2;
+
+    updateWaterSurface(water, elapsed);
+
+    const screenY = worldYToScreenY(waterHeightWorld);
+    updateUnderwaterOverlay(screenY, elapsed, true);
+  } else {
+    updateUnderwaterOverlay(window.innerHeight * 0.5, elapsed, false);
+  }
+
+  renderer.render(scene, camera);
+}
+
+function worldYToScreenY(worldY) {
+  if (!camera) return window.innerHeight * 0.5;
+
+  const worldPoint = new THREE.Vector3(0, worldY, -3);
+  const projected = worldPoint.project(camera);
+
+  const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+
+  if (!Number.isFinite(y)) {
+    return window.innerHeight * 0.5;
+  }
+
+  return Math.max(0, Math.min(window.innerHeight, y));
+}
+
+function resetWaterHeight() {
+  markerLocked = false;
+  waterHeightWorld = null;
+  heightSampler = resetHeightSampler();
+
+  if (water) {
+    water.visible = false;
+  }
+
+  updateUnderwaterOverlay(window.innerHeight * 0.5, clock.elapsedTime, false);
+
+  setStatus("水面高さを再設定します。波マークをもう一度カメラに映してください。");
+}
+
+startButton.addEventListener("click", startAR);
+resetButton.addEventListener("click", resetWaterHeight);
+
+window.addEventListener("resize", () => {
+  if (renderer) {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+});
