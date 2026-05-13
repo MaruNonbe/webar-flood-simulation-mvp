@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>カメラ診断テスト</title>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+        "Yu Gothic", sans-serif;
+    }
+
+    #camera {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      background: #000;
+      z-index: 1;
+    }
+
+    #underwater {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 45vh;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0;
+      background:
+        radial-gradient(circle at 25% 20%, rgba(230,255,255,0.20), transparent 25%),
+        linear-gradient(
+          to bottom,
+          rgba(92, 216, 238, 0.30),
+          rgba(12, 126, 174, 0.58)
+        );
+      backdrop-filter: blur(1.2px) saturate(1.15);
+      -webkit-backdrop-filter: blur(1.2px) saturate(1.15);
+      transition: opacity 0.3s ease;
+    }
+
+    #water-line {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: 55vh;
+      height: 56px;
+      z-index: 4;
+      transform: translateY(-28px);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #water-line svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #wave-back {
+      fill: none;
+      stroke: rgba(0, 80, 120, 0.42);
+      stroke-width: 14;
+      stroke-linecap: round;
+    }
+
+    #wave-front {
+      fill: none;
+      stroke: rgba(220, 252, 255, 0.96);
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+
+    #panel {
+      position: fixed;
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 10;
+      background: rgba(0, 18, 32, 0.68);
+      color: #fff;
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 10px 34px rgba(0,0,0,0.3);
+    }
+
+    #title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    #status {
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      margin-bottom: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      color: #073247;
+      background: #effcff;
+      margin-right: 8px;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <video id="camera" autoplay muted playsinline webkit-playsinline></video>
+
+  <div id="underwater"></div>
+
+  <div id="water-line">
+    <svg viewBox="0 0 1200 96" preserveAspectRatio="none">
+      <path
+        id="wave-back"
+        d="M0,48 C100,26 200,70 300,48 C400,26 500,70 600,48 C700,26 800,70 900,48 C1000,26 1100,70 1200,48"
+      ></path>
+      <path
+        id="wave-front"
+        d="M0,48 C100,26 200,70 300,48 C400,26 500,70 600,48 C700,26 800,70 900,48 C1000,26 1100,70 1200,48"
+      ></path>
+    </svg>
+  </div>
+
+  <div id="panel">
+    <div id="title">カメラ診断テスト</div>
+    <div id="status">カメラ開始ボタンを押してください。</div>
+    <button id="start">カメラ開始</button>
+    <button id="toggleWater">水表現ON/OFF</button>
+  </div>
+
+  <script>
+    const video = document.getElementById("camera");
+    const statusEl = document.getElementById("status");
+    const startBtn = document.getElementById("start");
+    const toggleWaterBtn = document.getElementById("toggleWater");
+    const underwater = document.getElementById("underwater");
+    const waterLine = document.getElementById("water-line");
+    const waveBack = document.getElementById("wave-back");
+    const waveFront = document.getElementById("wave-front");
+
+    let waterVisible = false;
+    let animationStarted = false;
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    async function startCamera() {
+      setStatus("カメラ起動中です。許可を求められたら許可してください。");
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("このブラウザは getUserMedia に対応していません。");
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+
+        video.setAttribute("playsinline", "true");
+        video.setAttribute("webkit-playsinline", "true");
+        video.muted = true;
+
+        await video.play();
+
+        setStatus(
+          "カメラ映像を取得しました。\n" +
+          "映像が見えていれば、Safari/Chromeのカメラ取得は成功です。\n\n" +
+          getVideoDebugText()
+        );
+
+        waterVisible = true;
+        updateWaterVisibility();
+
+        if (!animationStarted) {
+          animationStarted = true;
+          requestAnimationFrame(animateWave);
+        }
+      } catch (error) {
+        console.error(error);
+
+        setStatus(
+          "カメラ起動に失敗しました。\n\n" +
+          "確認してください：\n" +
+          "1. HTTPSのURLで開いているか\n" +
+          "2. Safari/Chromeでカメラ許可しているか\n" +
+          "3. 他のアプリがカメラを使用していないか\n\n" +
+          String(error.message || error)
+        );
+      }
+    }
+
+    function getVideoDebugText() {
+      return [
+        `readyState: ${video.readyState}`,
+        `videoSize: ${video.videoWidth} x ${video.videoHeight}`,
+        `paused: ${video.paused}`,
+        `srcObject: ${video.srcObject ? "あり" : "なし"}`
+      ].join("\n");
+    }
+
+    function updateWaterVisibility() {
+      underwater.style.opacity = waterVisible ? "1" : "0";
+      waterLine.style.opacity = waterVisible ? "1" : "0";
+    }
+
+    function animateWave(time) {
+      const t = time * 0.001;
+      const d = buildWavePath(1200, 96, 10, t);
+      waveBack.setAttribute("d", d);
+      waveFront.setAttribute("d", d);
+
+      requestAnimationFrame(animateWave);
+    }
+
+    function buildWavePath(width, height, amp, phase) {
+      const mid = height / 2;
+      const step = 120;
+      let d = `M0,${mid}`;
+
+      for (let x = 0; x <= width; x += step) {
+        const x1 = x + step / 2;
+        const x2 = x + step;
+        const y1 = mid + Math.sin((x / width) * Math.PI * 4 + phase * 1.4) * amp;
+        const y2 = mid + Math.sin((x2 / width) * Math.PI * 4 + phase * 1.4) * amp;
+
+        d += ` Q${x1},${y1} ${x2},${y2}`;
+      }
+
+      return d;
+    }
+
+    startBtn.addEventListener("click", startCamera);
+
+    toggleWaterBtn.addEventListener("click", () => {
+      waterVisible = !waterVisible;
+      updateWaterVisibility();
+    });
+  </script>
+</body>
+</html>
