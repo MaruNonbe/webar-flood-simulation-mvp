@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>WebAR 浸水シミュレーション MVP v2</title>
+  <title>WebAR 浸水シミュレーション MVP v2.2</title>
 
   <style>
     :root {
@@ -294,6 +294,85 @@
       line-height: 1.5;
       color: rgba(255,255,255,0.74);
     }
+
+    /* UI compact / hidden controls */
+    #ui-panel {
+      transition: opacity 0.22s ease, transform 0.22s ease, max-height 0.22s ease;
+    }
+
+    body.ui-compact #ui-panel {
+      padding: 10px;
+      border-radius: 14px;
+      max-width: 560px;
+    }
+
+    body.ui-compact #title {
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    body.ui-compact #status,
+    body.ui-compact #help,
+    body.ui-compact #notice {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.ui-compact #buttons {
+      margin-bottom: 6px;
+      gap: 6px;
+    }
+
+    body.ui-compact button {
+      min-height: 36px;
+      padding: 8px 11px;
+      font-size: 13px;
+    }
+
+    body.ui-compact #height-controls {
+      margin-top: 6px;
+      gap: 6px;
+    }
+
+    body.ui-compact #height-label {
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    body.ui-hidden #ui-panel {
+      opacity: 0;
+      transform: translateY(22px);
+      pointer-events: none;
+    }
+
+    #show-panel-button {
+      position: fixed;
+      left: 50%;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(16px);
+      z-index: 10000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      background: rgba(239, 252, 255, 0.96);
+      color: #073247;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 900;
+      box-shadow: 0 8px 26px rgba(0,0,0,0.28);
+    }
+
+    body.ui-hidden #show-panel-button {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+
   </style>
 </head>
 
@@ -316,7 +395,7 @@
   <div id="fixed-badge">水面高さ 固定中</div>
 
   <main id="ui-panel">
-    <div id="title">WebAR 浸水シミュレーション MVP v2</div>
+    <div id="title">WebAR 浸水シミュレーション MVP v2.2</div>
     <div id="status">カメラ開始を押してください。
 Chromeで映れば、第1段階は成功です。</div>
 
@@ -325,6 +404,8 @@ Chromeで映れば、第1段階は成功です。</div>
       <button id="toggle-water" type="button">水表現ON/OFF</button>
       <button id="fix-height" class="fixed" type="button">この高さに固定</button>
       <button id="reset-height" type="button">高さ初期化</button>
+      <button id="compact-ui" type="button">UI小さく</button>
+      <button id="hide-ui" type="button">UI非表示</button>
       <button id="stop-camera" class="warn" type="button">カメラ停止</button>
     </div>
 
@@ -352,6 +433,8 @@ Chromeで映れば、第1段階は成功です。</div>
     </div>
   </main>
 
+  <button id="show-panel-button" type="button">操作パネルを表示</button>
+
   <script>
     const video = document.getElementById("camera");
     const statusEl = document.getElementById("status");
@@ -362,23 +445,29 @@ Chromeで映れば、第1段階は成功です。</div>
     const resetHeightButton = document.getElementById("reset-height");
     const waterUpButton = document.getElementById("water-up");
     const waterDownButton = document.getElementById("water-down");
+    const compactUiButton = document.getElementById("compact-ui");
+    const hideUiButton = document.getElementById("hide-ui");
+    const showPanelButton = document.getElementById("show-panel-button");
     const heightSlider = document.getElementById("height-slider");
     const heightLabel = document.getElementById("height-label");
     const waveShadow = document.getElementById("wave-shadow");
     const waveHighlight = document.getElementById("wave-highlight");
     const waveThin = document.getElementById("wave-thin");
 
-    const STORAGE_KEY = "webarFloodStableMvpV2";
+    const STORAGE_KEY = "webarFloodStableMvpV22";
     let stream = null;
     let waterVisible = true;
     let waterPercent = 55;
     let waterFixed = false;
+    let uiCompact = false;
+    let uiHidden = false;
     let waveStarted = false;
 
     loadState();
     applyWaterLevel();
     updateWaterVisibility();
-    updateStatus("カメラ開始を押してください。\\nChromeで映れば、第1段階は成功です。");
+    applyUIState();
+    updateStatus("カメラ開始を押してください。\nChromeで映れば、第1段階は成功です。");
 
     function updateStatus(text) {
       statusEl.textContent = text;
@@ -395,6 +484,8 @@ Chromeで映れば、第1段階は成功です。</div>
         }
         waterVisible = state.waterVisible !== false;
         waterFixed = !!state.waterFixed;
+        uiCompact = !!state.uiCompact;
+        uiHidden = false;
       } catch (error) {
         console.warn("localStorage load failed", error);
       }
@@ -407,7 +498,8 @@ Chromeで映れば、第1段階は成功です。</div>
           JSON.stringify({
             waterPercent,
             waterVisible,
-            waterFixed
+            waterFixed,
+            uiCompact
           })
         );
       } catch (error) {
@@ -454,13 +546,13 @@ Chromeで映れば、第1段階は成功です。</div>
         }
 
         updateStatus(
-          "カメラ映像を取得しました。\\n" +
-          "映像が見えていれば、第2段階の土台は成功です。\\n\\n" +
+          "カメラ映像を取得しました。\n" +
+          "映像が見えていれば、第2段階の土台は成功です。\n\n" +
           getVideoDebugText()
         );
       } catch (error) {
         updateStatus(
-          "カメラ起動に失敗しました。\\n\\n" +
+          "カメラ起動に失敗しました。\n\n" +
           explainCameraError(error)
         );
       }
@@ -482,19 +574,19 @@ Chromeで映れば、第1段階は成功です。</div>
       const message = error && error.message ? error.message : String(error);
 
       if (name === "NotAllowedError") {
-        return "カメラ許可が拒否されています。\\nブラウザのサイト設定でカメラを許可してください。\\n\\n" + message;
+        return "カメラ許可が拒否されています。\nブラウザのサイト設定でカメラを許可してください。\n\n" + message;
       }
 
       if (name === "NotFoundError") {
-        return "カメラが見つかりません。\\n別ブラウザまたは端末で確認してください。\\n\\n" + message;
+        return "カメラが見つかりません。\n別ブラウザまたは端末で確認してください。\n\n" + message;
       }
 
       if (name === "NotReadableError") {
-        return "カメラを読み取れません。\\n他のアプリがカメラを使用していないか確認してください。\\n\\n" + message;
+        return "カメラを読み取れません。\n他のアプリがカメラを使用していないか確認してください。\n\n" + message;
       }
 
       if (!window.isSecureContext) {
-        return "HTTPSではありません。\\nGitHub Pagesの https:// で始まるURLを開いてください。\\n\\n" + message;
+        return "HTTPSではありません。\nGitHub Pagesの https:// で始まるURLを開いてください。\n\n" + message;
       }
 
       return message;
@@ -509,7 +601,7 @@ Chromeで映れば、第1段階は成功です。</div>
         "srcObject: " + (video.srcObject ? "あり" : "なし"),
         "secureContext: " + (window.isSecureContext ? "OK" : "NG"),
         "水面固定: " + (waterFixed ? "ON" : "OFF")
-      ].join("\\n");
+      ].join("\n");
     }
 
     function setWaterPercent(nextValue) {
@@ -530,6 +622,29 @@ Chromeで映れば、第1段階は成功です。</div>
       saveState();
     }
 
+    function applyUIState() {
+      document.body.classList.toggle("ui-compact", uiCompact);
+      document.body.classList.toggle("ui-hidden", uiHidden);
+      compactUiButton.textContent = uiCompact ? "UI戻す" : "UI小さく";
+    }
+
+    function toggleCompactUI() {
+      uiCompact = !uiCompact;
+      applyUIState();
+      saveState();
+    }
+
+    function hideUI() {
+      uiHidden = true;
+      applyUIState();
+    }
+
+    function showUI() {
+      uiHidden = false;
+      applyUIState();
+    }
+
+
     function fixHeight() {
       waterFixed = !waterFixed;
       document.body.classList.toggle("is-fixed", waterFixed);
@@ -538,7 +653,7 @@ Chromeで映れば、第1段階は成功です。</div>
 
       updateStatus(
         (waterFixed ? "水面高さを固定しました。" : "水面高さの固定を解除しました。") +
-        "\\n現在の水面位置: " + waterPercent + "%\\n\\n" +
+        "\n現在の水面位置: " + waterPercent + "%\n\n" +
         getVideoDebugText()
       );
     }
@@ -551,7 +666,7 @@ Chromeで映れば、第1段階は成功です。</div>
       applyWaterLevel();
       saveState();
 
-      updateStatus("水面高さを初期化しました。\\n現在の水面位置: 55%");
+      updateStatus("水面高さを初期化しました。\n現在の水面位置: 55%");
     }
 
     function animateWave(time) {
@@ -599,17 +714,21 @@ Chromeで映れば、第1段階は成功です。</div>
       updateStatus("水表現: " + (waterVisible ? "ON" : "OFF"));
     });
 
+    compactUiButton.addEventListener("click", toggleCompactUI);
+    hideUiButton.addEventListener("click", hideUI);
+    showPanelButton.addEventListener("click", showUI);
+
     fixHeightButton.addEventListener("click", fixHeight);
     resetHeightButton.addEventListener("click", resetHeight);
 
     waterUpButton.addEventListener("click", () => {
       setWaterPercent(waterPercent - 2);
-      updateStatus("水面を上げました。\\n現在の水面位置: " + waterPercent + "%");
+      updateStatus("水面を上げました。\n現在の水面位置: " + waterPercent + "%");
     });
 
     waterDownButton.addEventListener("click", () => {
       setWaterPercent(waterPercent + 2);
-      updateStatus("水面を下げました。\\n現在の水面位置: " + waterPercent + "%");
+      updateStatus("水面を下げました。\n現在の水面位置: " + waterPercent + "%");
     });
 
     heightSlider.addEventListener("input", () => {
@@ -617,6 +736,7 @@ Chromeで映れば、第1段階は成功です。</div>
     });
 
     fixHeightButton.textContent = waterFixed ? "固定解除" : "この高さに固定";
+    applyUIState();
   </script>
 </body>
 </html>
