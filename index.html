@@ -1,300 +1,187 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import { MindARThree } from "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js";
-
-import { createWaterSurface, updateWaterSurface } from "./water.js";
-import { updateUnderwaterOverlay } from "./underwater-overlay.js";
-import {
-  createHeightSampler,
-  resetHeightSampler,
-  sampleMarkerHeight,
-} from "./marker-height-controller.js";
-
-const TARGET_SRC = "./assets/targets/flood-marker.mind";
-
-const container = document.querySelector("#ar-container");
-const startButton = document.querySelector("#start-button");
-const resetButton = document.querySelector("#reset-button");
-const statusText = document.querySelector("#status");
-
-let mindarThree = null;
-let renderer = null;
-let scene = null;
-let camera = null;
-let anchor = null;
-
-let water = null;
-let arStarted = false;
-let markerLocked = false;
-let waterHeightWorld = null;
-
-const clock = new THREE.Clock();
-let heightSampler = createHeightSampler();
-
-function setStatus(message) {
-  if (statusText) {
-    statusText.textContent = message;
-  }
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
 }
 
-function forceCameraVideoVisible() {
-  const videos = document.querySelectorAll("video");
-  const canvases = document.querySelectorAll("canvas");
-
-  videos.forEach((video, index) => {
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("webkit-playsinline", "true");
-    video.muted = true;
-
-    video.style.position = "absolute";
-    video.style.left = "0";
-    video.style.top = "0";
-    video.style.width = "100%";
-    video.style.height = "100%";
-    video.style.objectFit = "cover";
-    video.style.zIndex = "1";
-    video.style.opacity = "1";
-    video.style.visibility = "visible";
-    video.style.display = "block";
-    video.style.background = "transparent";
-
-    console.log("[AR VIDEO]", index, {
-      readyState: video.readyState,
-      videoWidth: video.videoWidth,
-      videoHeight: video.videoHeight,
-      paused: video.paused,
-      srcObject: !!video.srcObject,
-    });
-  });
-
-  canvases.forEach((canvas, index) => {
-    canvas.style.position = "absolute";
-    canvas.style.left = "0";
-    canvas.style.top = "0";
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    canvas.style.zIndex = "2";
-    canvas.style.background = "transparent";
-    canvas.style.opacity = "1";
-    canvas.style.visibility = "visible";
-    canvas.style.display = "block";
-
-    console.log("[AR CANVAS]", index, {
-      width: canvas.width,
-      height: canvas.height,
-    });
-  });
+#ar-container {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: transparent;
+  z-index: 0;
 }
 
-function getCameraDebugText() {
-  const video = document.querySelector("video");
-
-  if (!video) {
-    return "video要素: なし";
-  }
-
-  return [
-    "video要素: あり",
-    `readyState: ${video.readyState}`,
-    `videoSize: ${video.videoWidth} x ${video.videoHeight}`,
-    `paused: ${video.paused}`,
-    `srcObject: ${video.srcObject ? "あり" : "なし"}`,
-  ].join("\n");
+/* MindAR camera/video/canvas visibility fix */
+#ar-container video,
+#ar-container canvas,
+video,
+canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
-async function startAR() {
-  if (arStarted) return;
-
-  if (!container) {
-    alert("ar-container が見つかりません。index.htmlを確認してください。");
-    return;
-  }
-
-  startButton.disabled = true;
-  setStatus("AR起動中です。カメラ許可を求められたら許可してください。");
-
-  try {
-    const targetCheck = await fetch(TARGET_SRC, { cache: "no-store" });
-
-    if (!targetCheck.ok) {
-      throw new Error(
-        `MindARターゲットが見つかりません。\n${TARGET_SRC}\nstatus=${targetCheck.status}`
-      );
-    }
-
-    mindarThree = new MindARThree({
-      container,
-      imageTargetSrc: TARGET_SRC,
-      maxTrack: 1,
-      filterMinCF: 0.0001,
-      filterBeta: 0.001,
-      uiScanning: "yes",
-      uiLoading: "yes",
-      uiError: "yes",
-    });
-
-    renderer = mindarThree.renderer;
-    scene = mindarThree.scene;
-    camera = mindarThree.camera;
-
-    // 黒いCanvasでカメラ映像を隠さないための設定
-    renderer.setClearColor(0x000000, 0);
-    renderer.autoClear = true;
-
-    if (renderer.domElement) {
-      renderer.domElement.style.background = "transparent";
-      renderer.domElement.style.position = "absolute";
-      renderer.domElement.style.left = "0";
-      renderer.domElement.style.top = "0";
-      renderer.domElement.style.width = "100%";
-      renderer.domElement.style.height = "100%";
-      renderer.domElement.style.zIndex = "2";
-      renderer.domElement.style.opacity = "1";
-    }
-
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x447788, 1.2);
-    scene.add(hemiLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.75);
-    directionalLight.position.set(1, 2, 1);
-    scene.add(directionalLight);
-
-    anchor = mindarThree.addAnchor(0);
-
-    anchor.onTargetFound = () => {
-      if (!markerLocked) {
-        setStatus("波マークを認識しました。水面高さを計測中です。");
-      } else {
-        setStatus("波マークを再認識しました。水面高さは保持中です。");
-      }
-    };
-
-    anchor.onTargetLost = () => {
-      if (markerLocked) {
-        setStatus("マーカーが画面外です。水面高さは保持しています。");
-      } else {
-        setStatus("波マークをカメラ中央に映してください。");
-      }
-    };
-
-    water = createWaterSurface();
-    water.visible = false;
-    scene.add(water);
-
-    await mindarThree.start();
-
-    arStarted = true;
-    resetButton.disabled = false;
-
-    // MindAR起動後に video / canvas の表示を強制調整
-    forceCameraVideoVisible();
-
-    setTimeout(() => {
-      forceCameraVideoVisible();
-      setStatus(
-        "ARを開始しました。\n" +
-          "浸水高さ標識の黒枠・波マーク・2.0m部分をカメラに映してください。\n\n" +
-          getCameraDebugText()
-      );
-    }, 800);
-
-    renderer.setAnimationLoop(renderLoop);
-  } catch (error) {
-    console.error(error);
-
-    setStatus(
-      "AR起動に失敗しました。\n" +
-        "確認してください：\n" +
-        "1. flood-marker.mind が assets/targets/ にあるか\n" +
-        "2. GitHub PagesのURLで開いているか\n" +
-        "3. Safari/Chromeでカメラ許可しているか\n\n" +
-        String(error.message || error)
-    );
-
-    startButton.disabled = false;
-  }
+/* Camera video should be behind WebGL canvas */
+#ar-container video,
+video {
+  z-index: 1 !important;
 }
 
-function renderLoop() {
-  const elapsed = clock.elapsedTime;
-
-  if (!renderer || !scene || !camera) return;
-
-  if (anchor && anchor.group && anchor.group.visible && !markerLocked) {
-    const markerWorldPosition = new THREE.Vector3();
-    anchor.group.getWorldPosition(markerWorldPosition);
-
-    const result = sampleMarkerHeight(heightSampler, markerWorldPosition.y);
-
-    setStatus(
-      `水面高さを計測中です。\nサンプル数: ${result.count}\n波マークをなるべく動かさず映してください。`
-    );
-
-    if (result.ready) {
-      waterHeightWorld = result.height;
-      markerLocked = true;
-
-      setStatus(
-        `水面高さを固定しました。\nY=${waterHeightWorld.toFixed(
-          3
-        )}\nマーカーが画面外になっても保持します。`
-      );
-    }
-  }
-
-  if (waterHeightWorld !== null && water) {
-    water.visible = true;
-
-    water.position.set(0, waterHeightWorld, -3);
-    water.rotation.x = -Math.PI / 2;
-
-    updateWaterSurface(water, elapsed);
-
-    const screenY = worldYToScreenY(waterHeightWorld);
-    updateUnderwaterOverlay(screenY, elapsed, true);
-  } else {
-    updateUnderwaterOverlay(window.innerHeight * 0.5, elapsed, false);
-  }
-
-  renderer.render(scene, camera);
+/* Three.js canvas */
+#ar-container canvas,
+canvas {
+  z-index: 2 !important;
 }
 
-function worldYToScreenY(worldY) {
-  if (!camera) return window.innerHeight * 0.5;
-
-  const worldPoint = new THREE.Vector3(0, worldY, -3);
-  const projected = worldPoint.project(camera);
-
-  const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
-
-  if (!Number.isFinite(y)) {
-    return window.innerHeight * 0.5;
-  }
-
-  return Math.max(0, Math.min(window.innerHeight, y));
+/* MindARが追加する可能性のある要素を画面全体にする */
+.mindar-ui-overlay,
+.mindar-ui-loading,
+.mindar-ui-scanning,
+.mindar-ui-error {
+  z-index: 90 !important;
 }
 
-function resetWaterHeight() {
-  markerLocked = false;
-  waterHeightWorld = null;
-  heightSampler = resetHeightSampler();
-
-  if (water) {
-    water.visible = false;
-  }
-
-  updateUnderwaterOverlay(window.innerHeight * 0.5, clock.elapsedTime, false);
-
-  setStatus("水面高さを再設定します。波マークをもう一度カメラに映してください。");
+#underwater-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  opacity: 0;
+  z-index: 20;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 28% 18%, rgba(220, 255, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 78% 48%, rgba(170, 235, 255, 0.14), transparent 30%),
+    linear-gradient(to bottom, rgba(104, 218, 238, 0.30), rgba(23, 143, 181, 0.58));
+  backdrop-filter: blur(1.4px) saturate(1.12) contrast(0.93);
+  -webkit-backdrop-filter: blur(1.4px) saturate(1.12) contrast(0.93);
+  mix-blend-mode: normal;
+  transition: opacity 320ms ease;
 }
 
-startButton.addEventListener("click", startAR);
-resetButton.addEventListener("click", resetWaterHeight);
+#caustics-overlay {
+  position: fixed;
+  inset: 0;
+  opacity: 0;
+  z-index: 21;
+  pointer-events: none;
+  background-image:
+    repeating-radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.16) 0 1px, transparent 2px 24px),
+    repeating-radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.10) 0 1px, transparent 2px 28px);
+  background-size: 260px 180px, 320px 220px;
+  filter: blur(1.2px);
+  mix-blend-mode: screen;
+  transition: opacity 320ms ease;
+}
 
-window.addEventListener("resize", () => {
-  if (renderer) {
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-});
+#water-line {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 50vh;
+  height: 48px;
+  transform: translateY(-24px);
+  z-index: 22;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+#water-line svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#wave-path-back {
+  fill: none;
+  stroke: rgba(12, 91, 124, 0.38);
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+#wave-path-front {
+  fill: none;
+  stroke: rgba(218, 252, 255, 0.92);
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 3px rgba(0, 95, 140, 0.65));
+}
+
+#ui-panel {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 100;
+  color: white;
+  background: rgba(0, 18, 32, 0.58);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 34px rgba(0,0,0,0.26);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  max-width: 520px;
+}
+
+#title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+#status {
+  font-size: 13px;
+  line-height: 1.55;
+  min-height: 20px;
+  margin-bottom: 10px;
+}
+
+#buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-weight: 700;
+  color: #073247;
+  background: #effcff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+
+button:disabled {
+  opacity: 0.44;
+}
+
+details {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.86);
+}
+
+summary {
+  cursor: pointer;
+}
+
+ol {
+  margin: 6px 0 0 20px;
+  padding: 0;
+}
