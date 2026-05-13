@@ -1,41 +1,62 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 import { MindARThree } from "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js";
 
-import { MarkerHeightController } from "./marker-height-controller.js";
 import { createWaterSurface, updateWaterSurface } from "./water.js";
 import { updateUnderwaterOverlay } from "./underwater-overlay.js";
+import {
+  createHeightSampler,
+  resetHeightSampler,
+  sampleMarkerHeight,
+} from "./marker-height-controller.js";
+
+const TARGET_SRC = "./assets/targets/flood-marker.mind";
 
 const container = document.querySelector("#ar-container");
 const startButton = document.querySelector("#start-button");
 const resetButton = document.querySelector("#reset-button");
 const statusText = document.querySelector("#status");
 
-const TARGET_SRC = "./assets/targets/flood-marker.mind";
-
 let mindarThree = null;
 let renderer = null;
 let scene = null;
 let camera = null;
 let anchor = null;
-let water = null;
-let clock = new THREE.Clock();
-let heightController = new MarkerHeightController({ sampleDurationMs: 900, minSamples: 12 });
-let lastScreenY = window.innerHeight * 0.50;
-let arStarted = false;
 
-startButton.addEventListener("click", startAR);
-resetButton.addEventListener("click", resetWaterHeight);
-window.addEventListener("resize", () => {
-  if (renderer) renderer.setSize(window.innerWidth, window.innerHeight);
-});
+let water = null;
+let arStarted = false;
+let markerLocked = false;
+let waterHeightWorld = null;
+
+const clock = new THREE.Clock();
+let heightSampler = createHeightSampler();
+
+function setStatus(message) {
+  if (statusText) {
+    statusText.textContent = message;
+  }
+}
 
 async function startAR() {
   if (arStarted) return;
+
+  if (!container) {
+    alert("ar-container が見つかりません。index.htmlを確認してください。");
+    return;
+  }
 
   startButton.disabled = true;
   setStatus("AR起動中です。カメラ許可を求められたら許可してください。");
 
   try {
+    // flood-marker.mind が存在するか先に確認
+    const targetCheck = await fetch(TARGET_SRC, { cache: "no-store" });
+
+    if (!targetCheck.ok) {
+      throw new Error(
+        `MindARターゲットが見つかりません。\n${TARGET_SRC}\nstatus=${targetCheck.status}`
+      );
+    }
+
     mindarThree = new MindARThree({
       container,
       imageTargetSrc: TARGET_SRC,
@@ -51,111 +72,159 @@ async function startAR() {
     scene = mindarThree.scene;
     camera = mindarThree.camera;
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // 重要：Three.js Canvasが黒背景でカメラ映像を隠さないようにする
+    renderer.setClearColor(0x000000, 0);
+    renderer.autoClear = true;
+
+    if (renderer.domElement) {
+      renderer.domElement.style.background = "transparent";
+      renderer.domElement.style.position = "absolute";
+      renderer.domElement.style.inset = "0";
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
+      renderer.domElement.style.zIndex = "2";
+    }
+
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x255f7a, 1.25));
+    // ライト
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x447788, 1.2);
+    scene.add(hemiLight);
 
-    const directional = new THREE.DirectionalLight(0xffffff, 1.0);
-    directional.position.set(0.5, 1, 0.3);
-    scene.add(directional);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.75);
+    directionalLight.position.set(1, 2, 1);
+    scene.add(directionalLight);
 
+    // マーカー
     anchor = mindarThree.addAnchor(0);
+
     anchor.onTargetFound = () => {
-      if (!heightController.locked) {
-        setStatus("波マークを認識しました。水面高さをサンプリングしています…");
+      if (!markerLocked) {
+        setStatus("波マークを認識しました。水面高さを計測中です。");
       } else {
-        setStatus("波マークを再認識しました。水面高さは固定済みです。");
-      }
-    };
-    anchor.onTargetLost = () => {
-      if (heightController.locked) {
-        setStatus("マーカーが外れても水面高さを保持しています。");
-      } else {
-        setStatus("波マークをカメラに映してください。");
+        setStatus("波マークを再認識しました。水面高さは保持中です。");
       }
     };
 
+    anchor.onTargetLost = () => {
+      if (markerLocked) {
+        setStatus("マーカーが画面外です。水面高さは保持しています。");
+      } else {
+        setStatus("波マークをカメラ中央に映してください。");
+      }
+    };
+
+    // 水面
     water = createWaterSurface();
+    water.visible = false;
     scene.add(water);
 
     await mindarThree.start();
 
     arStarted = true;
-    startButton.textContent = "AR起動済み";
     resetButton.disabled = false;
-    setStatus("波マークをカメラに映してください。");
 
-    clock = new THREE.Clock();
+    setStatus(
+      "ARを開始しました。\n浸水高さ標識の黒枠・波マーク・2.0m部分をカメラに映してください。"
+    );
+
     renderer.setAnimationLoop(renderLoop);
   } catch (error) {
     console.error(error);
+
     setStatus(
-      "AR起動に失敗しました。HTTPS環境、カメラ許可、assets/targets/flood-marker.mind の有無を確認してください。"
+      "AR起動に失敗しました。\n" +
+        "確認してください：\n" +
+        "1. flood-marker.mind が assets/targets/ にあるか\n" +
+        "2. GitHub PagesのURLで開いているか\n" +
+        "3. Safari/Chromeでカメラ許可しているか\n\n" +
+        String(error.message || error)
     );
+
     startButton.disabled = false;
   }
 }
 
 function renderLoop() {
-  const elapsedTime = clock.getElapsedTime();
-  const nowMs = performance.now();
+  const elapsed = clock.elapsedTime;
 
-  const isMarkerVisible = Boolean(anchor?.group?.visible);
-  if (isMarkerVisible && !heightController.locked) {
-    heightController.updateFromAnchor(anchor.group, nowMs);
-    const progress = Math.round(heightController.getProgress(nowMs) * 100);
-    setStatus(`水面高さを測定中… ${progress}%`);
+  if (!renderer || !scene || !camera) return;
+
+  if (anchor && anchor.group && anchor.group.visible && !markerLocked) {
+    const markerWorldPosition = new THREE.Vector3();
+    anchor.group.getWorldPosition(markerWorldPosition);
+
+    const result = sampleMarkerHeight(heightSampler, markerWorldPosition.y);
+
+    setStatus(
+      `水面高さを計測中です。\nサンプル数: ${result.count}\n波マークをなるべく動かさず映してください。`
+    );
+
+    if (result.ready) {
+      waterHeightWorld = result.height;
+      markerLocked = true;
+
+      setStatus(
+        `水面高さを固定しました。\nY=${waterHeightWorld.toFixed(
+          3
+        )}\nマーカーが画面外になっても保持します。`
+      );
+    }
   }
 
-  const state = heightController.getState();
-  if (state.locked && typeof state.waterHeightWorld === "number") {
-    updateWaterObject(state.waterHeightWorld, elapsedTime);
+  if (waterHeightWorld !== null && water) {
+    water.visible = true;
 
-    if (isMarkerVisible) {
-      lastScreenY = worldPointToScreenY(new THREE.Vector3(0, state.waterHeightWorld, -2.8));
-    }
+    // 水面を水平面として固定
+    water.position.set(0, waterHeightWorld, -3);
+    water.rotation.x = -Math.PI / 2;
 
-    updateUnderwaterOverlay(lastScreenY, elapsedTime, true);
-    if (!isMarkerVisible) {
-      setStatus("水面高さを保持中です。必要に応じて再設定できます。");
-    }
+    updateWaterSurface(water, elapsed);
+
+    const screenY = worldYToScreenY(waterHeightWorld);
+    updateUnderwaterOverlay(screenY, elapsed, true);
   } else {
-    if (water) water.visible = false;
-    updateUnderwaterOverlay(lastScreenY, elapsedTime, false);
+    updateUnderwaterOverlay(window.innerHeight * 0.5, elapsed, false);
   }
 
   renderer.render(scene, camera);
 }
 
-function updateWaterObject(waterHeightWorld, elapsedTime) {
-  if (!water) return;
+function worldYToScreenY(worldY) {
+  if (!camera) return window.innerHeight * 0.5;
 
-  water.visible = true;
-  water.position.set(0, waterHeightWorld, -2.8);
-  water.rotation.set(-Math.PI / 2, 0, 0);
+  const worldPoint = new THREE.Vector3(0, worldY, -3);
+  const projected = worldPoint.project(camera);
 
-  updateWaterSurface(water, elapsedTime);
-}
-
-function worldPointToScreenY(worldPoint) {
-  const projected = worldPoint.clone().project(camera);
   const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
 
-  if (!Number.isFinite(y)) return lastScreenY;
+  if (!Number.isFinite(y)) {
+    return window.innerHeight * 0.5;
+  }
+
   return Math.max(0, Math.min(window.innerHeight, y));
 }
 
 function resetWaterHeight() {
-  heightController.reset();
-  lastScreenY = window.innerHeight * 0.50;
-  if (water) water.visible = false;
-  updateUnderwaterOverlay(lastScreenY, clock.getElapsedTime(), false);
-  setStatus("水面高さを再設定します。波マークをカメラに映してください。");
+  markerLocked = false;
+  waterHeightWorld = null;
+  heightSampler = resetHeightSampler();
+
+  if (water) {
+    water.visible = false;
+  }
+
+  updateUnderwaterOverlay(window.innerHeight * 0.5, clock.elapsedTime, false);
+
+  setStatus("水面高さを再設定します。波マークをもう一度カメラに映してください。");
 }
 
-function setStatus(message) {
-  if (statusText && statusText.textContent !== message) {
-    statusText.textContent = message;
+startButton.addEventListener("click", startAR);
+resetButton.addEventListener("click", resetWaterHeight);
+
+window.addEventListener("resize", () => {
+  if (renderer) {
+    renderer.setSize(window.innerWidth, window.innerHeight);
   }
-}
+});
