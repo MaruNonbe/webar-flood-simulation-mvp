@@ -1,0 +1,166 @@
+/* スマホ姿勢ナビ */
+.posture-guide {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 190px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  z-index: 9999;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  box-sizing: border-box;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.posture-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.posture-title {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.posture-small-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111;
+}
+
+.posture-level {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 8px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.posture-level::before,
+.posture-level::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.posture-level::before {
+  left: 50%;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.posture-level::after {
+  top: 50%;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.posture-target {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.posture-bubble {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #00e676;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.95);
+  transition:
+    transform 0.12s linear,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.posture-status {
+  min-height: 34px;
+  line-height: 1.35;
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.posture-debug {
+  font-size: 10px;
+  line-height: 1.35;
+  opacity: 0.8;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.posture-debug.hidden {
+  display: none;
+}
+
+.posture-buttons {
+  display: flex;
+  gap: 6px;
+  flex-direction: column;
+}
+
+.posture-buttons button {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+
+.posture-guide.posture-ok {
+  border: 1px solid rgba(0, 230, 118, 0.8);
+}
+
+.posture-guide.posture-warn {
+  border: 1px solid rgba(255, 215, 64, 0.9);
+}
+
+.posture-guide.posture-danger {
+  border: 1px solid rgba(255, 82, 82, 0.95);
+}
+
+/* 小さい画面では少し縮小 */
+@media (max-width: 420px) {
+  .posture-guide {
+    width: 170px;
+    right: 8px;
+    bottom: 8px;
+    padding: 8px;
+  }
+
+  .posture-level {
+    width: 68px;
+    height: 68px;
+  }
+
+  .posture-status {
+    font-size: 11px;
+  }
+}

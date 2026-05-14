@@ -3,22 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>WebAR 浸水深シミュレーション v2.7 Gyro補正版</title>
+  <title>Web版 浸水深シミュレーション</title>
+
+  <!-- 既存CSSがある場合は残してください -->
+  <!-- <link rel="stylesheet" href="./style.css"> -->
+
+  <!-- スマホ姿勢ナビ用CSS -->
+  <link rel="stylesheet" href="./postureGuide.css">
 
   <style>
-    :root {
-      --water-top: 55vh;
-      --water-rotate: 0deg;
-      --panel-bg: rgba(0, 18, 32, 0.76);
-      --panel-border: rgba(255, 255, 255, 0.22);
-      --button-bg: #effcff;
-      --button-text: #073247;
-      --water-blue-1: rgba(92, 200, 218, 0.26);
-      --water-blue-2: rgba(18, 126, 170, 0.52);
-      --water-opacity: 0.88;
-      --caustics-opacity: 0.20;
-    }
-
     html,
     body {
       margin: 0;
@@ -27,1105 +20,289 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Hiragino Sans",
-        "Yu Gothic", "Yu Gothic UI", sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       touch-action: none;
-      -webkit-user-select: none;
-      user-select: none;
     }
 
-    #camera {
+    /* カメラ映像 */
+    #cameraVideo {
       position: fixed;
       inset: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       object-fit: cover;
       background: #000;
       z-index: 1;
     }
 
-    #camera-placeholder {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background:
-        radial-gradient(circle at 30% 20%, rgba(0, 80, 110, 0.28), transparent 28%),
-        radial-gradient(circle at 70% 60%, rgba(0, 130, 165, 0.22), transparent 34%),
-        #000;
-    }
-
-    #underwater-overlay {
+    /* 水中フィルター */
+    #waterFilter {
       position: fixed;
       left: 0;
       right: 0;
-      top: var(--water-top);
+      top: 50%;
       bottom: 0;
+      background: rgba(0, 160, 220, 0.32);
+      backdrop-filter: blur(1px);
+      -webkit-backdrop-filter: blur(1px);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* 水面ライン */
+    #waterLine {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 4px;
+      background: rgba(80, 220, 255, 0.95);
+      box-shadow:
+        0 0 10px rgba(80, 220, 255, 0.9),
+        0 0 22px rgba(80, 220, 255, 0.55);
       z-index: 3;
       pointer-events: none;
-      opacity: var(--water-opacity);
-      background:
-        radial-gradient(circle at 24% 16%, rgba(235, 255, 255, 0.16), transparent 23%),
-        radial-gradient(circle at 78% 44%, rgba(200, 242, 255, 0.12), transparent 31%),
-        linear-gradient(to bottom, var(--water-blue-1), var(--water-blue-2));
-      backdrop-filter: blur(0.95px) saturate(1.10) contrast(0.96);
-      -webkit-backdrop-filter: blur(0.95px) saturate(1.10) contrast(0.96);
-      transition: opacity 0.25s ease, top 0.12s linear;
     }
 
-    #caustics-overlay {
-      position: fixed;
-      left: 0;
-      right: 0;
-      top: var(--water-top);
-      bottom: 0;
-      z-index: 4;
-      pointer-events: none;
-      opacity: var(--caustics-opacity);
-      background-image:
-        repeating-radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.14) 0 1px, transparent 2px 24px),
-        repeating-radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.08) 0 1px, transparent 2px 30px);
-      background-size: 280px 190px, 330px 230px;
-      filter: blur(1.4px);
-      mix-blend-mode: screen;
-      animation: causticsMove 9s linear infinite;
-      transition: opacity 0.25s ease, top 0.12s linear;
-    }
-
-    @keyframes causticsMove {
-      from { background-position: 0 0, 0 0; }
-      to { background-position: 280px 190px, -330px 230px; }
-    }
-
-    #water-line {
-      position: fixed;
-      left: -8vw;
-      right: -8vw;
-      top: var(--water-top);
-      height: 62px;
-      transform: translateY(-31px) rotate(var(--water-rotate));
-      transform-origin: center center;
-      z-index: 5;
-      pointer-events: none;
-      opacity: 1;
-      transition: opacity 0.25s ease, top 0.12s linear;
-    }
-
-    #water-line svg {
-      display: block;
-      width: 116vw;
-      height: 100%;
-    }
-
-    #wave-shadow {
-      fill: none;
-      stroke: rgba(0, 58, 92, 0.44);
-      stroke-width: 10;
-      stroke-linecap: round;
-    }
-
-    #wave-highlight {
-      fill: none;
-      stroke: rgba(224, 254, 255, 0.86);
-      stroke-width: 3;
-      stroke-linecap: round;
-      filter: drop-shadow(0 2px 3px rgba(0, 80, 130, 0.48));
-    }
-
-    #wave-thin {
-      fill: none;
-      stroke: rgba(130, 225, 245, 0.42);
-      stroke-width: 1.5;
-      stroke-linecap: round;
-      transform: translateY(8px);
-    }
-
-    #water-depth-guide {
-      position: fixed;
-      left: 0;
-      right: 0;
-      top: var(--water-top);
-      z-index: 6;
-      transform: translateY(-1px);
-      border-top: 1.5px dashed rgba(255, 255, 255, 0.52);
-      pointer-events: none;
-      opacity: 0.28;
-      transition: opacity 0.25s ease, top 0.12s linear;
-    }
-
-    #fixed-badge {
-      position: fixed;
-      right: 12px;
-      top: calc(var(--water-top) - 48px);
-      z-index: 7;
-      background: rgba(0, 40, 60, 0.70);
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      color: white;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 900;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease, top 0.12s linear;
-    }
-
-    body.is-fixed #fixed-badge {
-      opacity: 1;
-    }
-
-    body.water-off #underwater-overlay,
-    body.water-off #caustics-overlay,
-    body.water-off #water-line,
-    body.water-off #water-depth-guide {
-      opacity: 0;
-    }
-
-    #ui-panel {
-      position: fixed;
-      left: max(10px, env(safe-area-inset-left));
-      right: max(10px, env(safe-area-inset-right));
-      bottom: max(10px, env(safe-area-inset-bottom));
-      z-index: 9999;
-      color: #fff;
-      background: var(--panel-bg);
-      border: 1px solid var(--panel-border);
-      border-radius: 18px;
-      padding: 14px;
-      box-shadow: 0 12px 38px rgba(0, 0, 0, 0.36);
-      backdrop-filter: blur(9px);
-      -webkit-backdrop-filter: blur(9px);
-      max-width: 760px;
-      margin-inline: auto;
-      transition: opacity 0.22s ease, transform 0.22s ease, max-height 0.22s ease;
-    }
-
-    #title {
-      font-size: clamp(18px, 4.8vw, 28px);
-      line-height: 1.15;
-      font-weight: 900;
-      margin-bottom: 8px;
-      letter-spacing: 0.02em;
-    }
-
-    #status {
-      font-size: clamp(12px, 3.3vw, 15px);
-      line-height: 1.48;
-      white-space: pre-wrap;
-      margin-bottom: 12px;
-    }
-
-    #buttons {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    button {
-      appearance: none;
-      border: 0;
-      border-radius: 999px;
-      padding: 10px 14px;
-      font-weight: 900;
-      color: var(--button-text);
-      background: var(--button-bg);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-      min-height: 42px;
-    }
-
-    button.warn {
-      background: #ffd9cf;
-      color: #4b1408;
-    }
-
-    button.fixed {
-      background: #e6fff2;
-      color: #063f25;
-    }
-
-    button.mode {
-      background: #e8ecff;
-      color: #10245d;
-    }
-
-    button.primary {
-      background: #dff8ff;
-      color: #053244;
-    }
-
-    button.gyro {
-      background: #fff3c7;
-      color: #4a3300;
-    }
-
-    button:active {
-      transform: translateY(1px);
-    }
-
-    button:disabled {
-      opacity: 0.45;
-      transform: none;
-    }
-
-    #height-controls {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 10px;
-      align-items: center;
-      margin-top: 10px;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: #2da9ff;
-    }
-
-    #height-label {
-      text-align: center;
-      font-size: 14px;
-      margin-top: 6px;
-      opacity: 0.95;
-    }
-
-    #effect-controls,
-    #gyro-controls {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 8px 10px;
-      align-items: center;
-      margin-top: 8px;
-    }
-
-    #effect-controls label,
-    #gyro-controls label {
-      font-size: 12px;
-      font-weight: 800;
-      opacity: 0.92;
-      white-space: nowrap;
-    }
-
-    #gyro-debug {
-      margin-top: 8px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      background: rgba(0,0,0,0.26);
-      font-size: 11px;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      color: rgba(255,255,255,0.88);
-    }
-
-    #help {
-      margin-top: 8px;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    #help summary {
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    #help ol {
-      margin: 6px 0 0 20px;
-      padding: 0;
-      line-height: 1.5;
-    }
-
-    #notice {
-      margin-top: 8px;
-      font-size: 11px;
-      line-height: 1.5;
-      color: rgba(255,255,255,0.74);
-    }
-
-    body.ui-compact #ui-panel {
-      padding: 10px;
-      border-radius: 14px;
-      max-width: 560px;
-    }
-
-    body.ui-compact #title {
-      font-size: 16px;
-      margin-bottom: 6px;
-    }
-
-    body.ui-compact #status,
-    body.ui-compact #help,
-    body.ui-compact #notice,
-    body.ui-compact #effect-controls,
-    body.ui-compact #gyro-controls,
-    body.ui-compact #gyro-debug {
+    /* 簡易波表現 */
+    #waterLine::before {
+      content: "";
       position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      opacity: 0;
-      pointer-events: none;
+      left: 0;
+      top: -8px;
+      width: 200%;
+      height: 18px;
+      background:
+        radial-gradient(circle at 20px 9px, rgba(255,255,255,0.8) 0 2px, transparent 3px),
+        radial-gradient(circle at 70px 9px, rgba(255,255,255,0.5) 0 1.5px, transparent 3px);
+      background-size: 90px 18px;
+      opacity: 0.5;
+      animation: waveMove 4s linear infinite;
     }
 
-    body.ui-compact #buttons {
-      margin-bottom: 6px;
-      gap: 6px;
+    @keyframes waveMove {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(-90px);
+      }
     }
 
-    body.ui-compact button {
-      min-height: 36px;
-      padding: 8px 11px;
-      font-size: 13px;
-    }
-
-    body.ui-compact #height-controls {
-      margin-top: 6px;
-      gap: 6px;
-    }
-
-    body.ui-compact #height-label {
-      font-size: 12px;
-      margin-top: 3px;
-    }
-
-    body.ui-hidden #ui-panel {
-      opacity: 0;
-      transform: translateY(22px);
-      pointer-events: none;
-    }
-
-    #show-panel-button {
+    /* 既存UI想定 */
+    #controlPanel {
       position: fixed;
-      right: max(12px, env(safe-area-inset-right));
-      bottom: max(12px, env(safe-area-inset-bottom));
-      transform: translateY(16px);
-      z-index: 10000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.22s ease, transform 0.22s ease;
-      background: rgba(239, 252, 255, 0.96);
-      color: #073247;
-      border: 1px solid rgba(255,255,255,0.5);
-      border-radius: 999px;
-      padding: 8px 13px;
-      min-height: 34px;
-      font-size: 13px;
-      font-weight: 900;
-      box-shadow: 0 8px 26px rgba(0,0,0,0.28);
-    }
-
-    body.ui-hidden #show-panel-button {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateY(0);
-    }
-
-    #toast {
-      position: fixed;
-      left: 50%;
-      top: max(18px, env(safe-area-inset-top));
-      z-index: 10001;
-      transform: translateX(-50%) translateY(-12px);
-      opacity: 0;
-      pointer-events: none;
+      left: 12px;
+      bottom: 12px;
+      width: min(56vw, 260px);
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(0, 0, 0, 0.62);
       color: #fff;
-      background: rgba(0, 34, 54, 0.82);
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 999px;
-      padding: 10px 16px;
-      font-size: 14px;
-      font-weight: 900;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.32);
-      transition: opacity 0.22s ease, transform 0.22s ease;
-      white-space: nowrap;
+      z-index: 20;
+      box-sizing: border-box;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
 
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
+    #controlPanel h1 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    #controlPanel p {
+      margin: 4px 0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .control-row button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.92);
+      color: #111;
+    }
+
+    .height-slider-wrap {
+      margin-top: 8px;
+    }
+
+    #waterHeightSlider {
+      width: 100%;
+    }
+
+    #cameraStartBtn {
+      width: 100%;
+      margin-top: 8px;
+      border: none;
+      border-radius: 999px;
+      padding: 10px;
+      font-weight: 700;
+      background: #ffffff;
+      color: #111;
+    }
+
+    @media (max-width: 420px) {
+      #controlPanel {
+        width: calc(100vw - 210px);
+        min-width: 140px;
+        padding: 10px;
+      }
+
+      #controlPanel h1 {
+        font-size: 13px;
+      }
+
+      #controlPanel p {
+        font-size: 11px;
+      }
+
+      .control-row button {
+        padding: 7px 8px;
+        font-size: 11px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <div id="camera-placeholder" aria-hidden="true"></div>
-  <video id="camera" autoplay muted playsinline webkit-playsinline></video>
+  <!-- カメラ映像 -->
+  <video id="cameraVideo" autoplay playsinline muted></video>
 
-  <div id="underwater-overlay" aria-hidden="true"></div>
-  <div id="caustics-overlay" aria-hidden="true"></div>
+  <!-- 水中フィルター -->
+  <div id="waterFilter"></div>
 
-  <div id="water-line" aria-hidden="true">
-    <svg viewBox="0 0 1200 100" preserveAspectRatio="none">
-      <path id="wave-shadow" d="M0,50 C100,32 200,68 300,50 C400,32 500,68 600,50 C700,32 800,68 900,50 C1000,32 1100,68 1200,50"></path>
-      <path id="wave-highlight" d="M0,50 C100,32 200,68 300,50 C400,32 500,68 600,50 C700,32 800,68 900,50 C1000,32 1100,68 1200,50"></path>
-      <path id="wave-thin" d="M0,50 C100,32 200,68 300,50 C400,32 500,68 600,50 C700,32 800,68 900,50 C1000,32 1100,68 1200,50"></path>
-    </svg>
+  <!-- 水面ライン -->
+  <div id="waterLine"></div>
+
+  <!-- 既存UI想定 -->
+  <div id="controlPanel">
+    <h1>浸水深シミュレーション</h1>
+    <p>水面ラインを浸水深標識や目安の高さに合わせてください。</p>
+    <p id="heightLabel">水面位置：50%</p>
+
+    <button id="cameraStartBtn" type="button">カメラ開始</button>
+
+    <div class="height-slider-wrap">
+      <input id="waterHeightSlider" type="range" min="10" max="90" value="50">
+    </div>
+
+    <div class="control-row">
+      <button type="button" data-height="30">高め</button>
+      <button type="button" data-height="50">中央</button>
+      <button type="button" data-height="70">低め</button>
+    </div>
   </div>
 
-  <div id="water-depth-guide" aria-hidden="true"></div>
-  <div id="fixed-badge">水面高さ 固定中</div>
-  <div id="toast" role="status" aria-live="polite">水面高さを固定しました</div>
-
-  <main id="ui-panel">
-    <div id="title">WebAR 浸水深シミュレーション v2.7 Gyro補正版</div>
-    <div id="status">カメラ開始を押してください。
-ジャイロ補正はオプションです。まず通常表示で確認してください。</div>
-
-    <div id="buttons">
-      <button id="start-camera" class="primary" type="button">カメラ開始</button>
-      <button id="fix-height" class="fixed" type="button">この高さに固定</button>
-      <button id="experience-mode" class="mode" type="button">体験開始</button>
-      <button id="enable-gyro" class="gyro" type="button">ジャイロ補正ON</button>
-      <button id="set-gyro-base" class="gyro" type="button">基準設定</button>
-      <button id="invert-gyro" class="gyro" type="button">補正反転</button>
-      <button id="toggle-water" type="button">水表現ON/OFF</button>
-      <button id="reset-height" type="button">高さ初期化</button>
-      <button id="compact-ui" type="button">UI小さく</button>
-      <button id="hide-ui" type="button">UI非表示</button>
-      <button id="stop-camera" class="warn" type="button">カメラ停止</button>
+  <!-- スマホ姿勢ナビUI -->
+  <div id="postureGuide" class="posture-guide">
+    <div class="posture-header">
+      <span class="posture-title">スマホ姿勢ナビ</span>
+      <button id="postureToggleDebug" class="posture-small-btn" type="button">詳細</button>
     </div>
 
-    <div id="height-controls">
-      <button id="water-up" type="button">水面↑</button>
-      <input id="height-slider" type="range" min="15" max="88" step="1" value="55" />
-      <button id="water-down" type="button">水面↓</button>
+    <div class="posture-level">
+      <div class="posture-target"></div>
+      <div id="postureBubble" class="posture-bubble"></div>
     </div>
 
-    <div id="height-label">水面位置: 55%</div>
-
-    <div id="effect-controls">
-      <label for="water-density-slider">水の濃さ</label>
-      <input id="water-density-slider" type="range" min="35" max="100" step="5" value="88" />
-
-      <label for="wave-strength-slider">波の強さ</label>
-      <input id="wave-strength-slider" type="range" min="3" max="18" step="1" value="9" />
+    <div id="postureStatus" class="posture-status">
+      傾きセンサーを開始してください
     </div>
 
-    <div id="gyro-controls">
-      <label for="gyro-strength-slider">補正強度</label>
-      <input id="gyro-strength-slider" type="range" min="0" max="100" step="5" value="35" />
+    <div id="postureDebug" class="posture-debug hidden">
+      beta: -- / gamma: --<br>
+      diffBeta: -- / diffGamma: --
     </div>
 
-    <div id="gyro-debug">ジャイロ補正: OFF</div>
-
-    <details id="help">
-      <summary>使い方・確認ポイント</summary>
-      <ol>
-        <li>「カメラ開始」を押し、カメラを許可します。</li>
-        <li>標識や対象物を見ながら、水面ラインを手動で合わせます。</li>
-        <li>「この高さに固定」を押して、水面高さを保存します。</li>
-        <li>ジャイロ補正を使う場合は、スマホをなるべく垂直にして「ジャイロ補正ON」→「基準設定」を押します。</li>
-        <li>スマホを上下に傾けたとき、水面ラインが疑似的に補正されます。</li>
-        <li>不自然な場合は「補正反転」または「ジャイロ補正OFF」を使ってください。</li>
-      </ol>
-    </details>
-
-    <div id="notice">
-      ※ v2.7はジャイロ補正の実験版です。実際の浸水状況を正確に再現するものではなく、防災啓発用の視覚補助です。
+    <div class="posture-buttons">
+      <button id="postureStartBtn" type="button">傾きセンサー開始</button>
+      <button id="postureCalibrateBtn" type="button">この角度を基準にする</button>
     </div>
-  </main>
-
-  <button id="show-panel-button" type="button">操作</button>
+  </div>
 
   <script>
-    const video = document.getElementById("camera");
-    const statusEl = document.getElementById("status");
-    const startCameraButton = document.getElementById("start-camera");
-    const stopCameraButton = document.getElementById("stop-camera");
-    const toggleWaterButton = document.getElementById("toggle-water");
-    const fixHeightButton = document.getElementById("fix-height");
-    const experienceModeButton = document.getElementById("experience-mode");
-    const resetHeightButton = document.getElementById("reset-height");
-    const waterUpButton = document.getElementById("water-up");
-    const waterDownButton = document.getElementById("water-down");
-    const compactUiButton = document.getElementById("compact-ui");
-    const hideUiButton = document.getElementById("hide-ui");
-    const showPanelButton = document.getElementById("show-panel-button");
+    /*
+      既存のカメラ表示・水面ライン調整処理の簡易版です。
+      すでに既存JSがある場合、このscript部分は無理に置き換えず、
+      既存処理を残してください。
+    */
 
-    const enableGyroButton = document.getElementById("enable-gyro");
-    const setGyroBaseButton = document.getElementById("set-gyro-base");
-    const invertGyroButton = document.getElementById("invert-gyro");
-
-    const heightSlider = document.getElementById("height-slider");
-    const waterDensitySlider = document.getElementById("water-density-slider");
-    const waveStrengthSlider = document.getElementById("wave-strength-slider");
-    const gyroStrengthSlider = document.getElementById("gyro-strength-slider");
-
-    const heightLabel = document.getElementById("height-label");
-    const gyroDebug = document.getElementById("gyro-debug");
-
-    const waveShadow = document.getElementById("wave-shadow");
-    const waveHighlight = document.getElementById("wave-highlight");
-    const waveThin = document.getElementById("wave-thin");
-    const toast = document.getElementById("toast");
-
-    const STORAGE_KEY = "webarFloodDepthGyroV27";
-
-    let stream = null;
-    let waterVisible = true;
-    let waterPercent = 55;
-    let displayedWaterPercent = 55;
-    let baseWaterPercent = 55;
-    let waterFixed = false;
-    let uiCompact = false;
-    let uiHidden = false;
-    let waterDensity = 88;
-    let waveStrength = 9;
-
-    let gyroEnabled = false;
-    let gyroReady = false;
-    let gyroDirection = 1;
-    let gyroStrength = 0.35;
-
-    let currentPitch = 0;
-    let currentRoll = 0;
-    let smoothedPitch = 0;
-    let smoothedRoll = 0;
-    let basePitch = null;
-    let baseRoll = null;
-
-    let autoHideTimer = null;
-    let toastTimer = null;
-    let waveStarted = false;
-
-    loadState();
-    applyWaterLevel();
-    updateWaterVisibility();
-    applyUIState();
-    applyEffectSettings();
-    updateGyroDebug();
-    updateStatus("カメラ開始を押してください。\nジャイロ補正はオプションです。まず通常表示で確認してください。");
-
-    function updateStatus(text) {
-      statusEl.textContent = text;
-    }
-
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-
-        const state = JSON.parse(raw);
-
-        if (Number.isFinite(state.waterPercent)) {
-          waterPercent = clamp(state.waterPercent, 15, 88);
-          displayedWaterPercent = waterPercent;
-          baseWaterPercent = waterPercent;
-          heightSlider.value = String(waterPercent);
-        }
-
-        waterVisible = state.waterVisible !== false;
-        waterFixed = !!state.waterFixed;
-        uiCompact = !!state.uiCompact;
-        uiHidden = false;
-
-        if (Number.isFinite(state.waterDensity)) {
-          waterDensity = clamp(state.waterDensity, 35, 100);
-          waterDensitySlider.value = String(waterDensity);
-        }
-
-        if (Number.isFinite(state.waveStrength)) {
-          waveStrength = clamp(state.waveStrength, 3, 18);
-          waveStrengthSlider.value = String(waveStrength);
-        }
-
-        if (Number.isFinite(state.gyroStrength)) {
-          gyroStrength = clamp(state.gyroStrength, 0, 1);
-          gyroStrengthSlider.value = String(Math.round(gyroStrength * 100));
-        }
-
-        if (state.gyroDirection === -1) {
-          gyroDirection = -1;
-        }
-      } catch (error) {
-        console.warn("localStorage load failed", error);
-      }
-    }
-
-    function saveState() {
-      try {
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            waterPercent,
-            waterVisible,
-            waterFixed,
-            uiCompact,
-            waterDensity,
-            waveStrength,
-            gyroStrength,
-            gyroDirection
-          })
-        );
-      } catch (error) {
-        console.warn("localStorage save failed", error);
-      }
-    }
+    const cameraVideo = document.getElementById("cameraVideo");
+    const cameraStartBtn = document.getElementById("cameraStartBtn");
+    const waterLine = document.getElementById("waterLine");
+    const waterFilter = document.getElementById("waterFilter");
+    const waterHeightSlider = document.getElementById("waterHeightSlider");
+    const heightLabel = document.getElementById("heightLabel");
 
     async function startCamera() {
-      updateStatus("カメラ起動中です。許可を求められたら許可してください。");
-
       try {
-        if (!window.isSecureContext) {
-          throw new Error("HTTPSではありません。GitHub PagesなどHTTPSのURLで開いてください。");
-        }
-
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("このブラウザは getUserMedia に対応していません。");
+          alert("このブラウザではカメラを利用できません。");
+          return;
         }
 
-        stopCamera();
-
-        const streamConstraints = {
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            facingMode: { ideal: "environment" }
           },
           audio: false
-        };
+        });
 
-        stream = await navigator.mediaDevices.getUserMedia(streamConstraints);
-
-        video.srcObject = stream;
-        video.setAttribute("playsinline", "true");
-        video.setAttribute("webkit-playsinline", "true");
-        video.muted = true;
-        video.autoplay = true;
-
-        await video.play();
-
-        if (!waveStarted) {
-          waveStarted = true;
-          requestAnimationFrame(animateWave);
-        }
-
-        updateStatus(
-          "カメラ映像を取得しました。\n" +
-          "水面位置を調整して「この高さに固定」を押してください。\n\n" +
-          getVideoDebugText()
-        );
+        cameraVideo.srcObject = stream;
       } catch (error) {
-        updateStatus(
-          "カメラ起動に失敗しました。\n\n" +
-          explainCameraError(error)
-        );
+        console.error("[Camera]", error);
+        alert("カメラを開始できませんでした。ブラウザの許可設定を確認してください。");
       }
     }
 
-    function stopCamera() {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-        stream = null;
+    function setWaterLinePosition(percent) {
+      const safePercent = Math.max(5, Math.min(95, Number(percent)));
+
+      waterLine.style.top = `${safePercent}%`;
+      waterFilter.style.top = `${safePercent}%`;
+
+      if (heightLabel) {
+        heightLabel.textContent = `水面位置：${safePercent}%`;
       }
 
-      if (video.srcObject) {
-        video.srcObject = null;
-      }
-    }
-
-    function explainCameraError(error) {
-      const name = error && error.name ? error.name : "";
-      const message = error && error.message ? error.message : String(error);
-
-      if (name === "NotAllowedError") {
-        return "カメラ許可が拒否されています。\nブラウザのサイト設定でカメラを許可してください。\n\n" + message;
-      }
-
-      if (name === "NotFoundError") {
-        return "カメラが見つかりません。\n別ブラウザまたは端末で確認してください。\n\n" + message;
-      }
-
-      if (name === "NotReadableError") {
-        return "カメラを読み取れません。\n他のアプリがカメラを使用していないか確認してください。\n\n" + message;
-      }
-
-      if (!window.isSecureContext) {
-        return "HTTPSではありません。\nGitHub Pagesの https:// で始まるURLを開いてください。\n\n" + message;
-      }
-
-      return message;
-    }
-
-    function getVideoDebugText() {
-      return [
-        "video要素: あり",
-        "readyState: " + video.readyState,
-        "videoSize: " + video.videoWidth + " x " + video.videoHeight,
-        "paused: " + video.paused,
-        "srcObject: " + (video.srcObject ? "あり" : "なし"),
-        "secureContext: " + (window.isSecureContext ? "OK" : "NG"),
-        "水面固定: " + (waterFixed ? "ON" : "OFF"),
-        "ジャイロ補正: " + (gyroEnabled ? "ON" : "OFF")
-      ].join("\n");
-    }
-
-    function setWaterPercent(nextValue) {
-      waterPercent = clamp(Number(nextValue), 15, 88);
-      baseWaterPercent = waterPercent;
-      displayedWaterPercent = waterPercent;
-      heightSlider.value = String(waterPercent);
-      applyWaterLevel();
-      saveState();
-    }
-
-    function applyWaterLevel() {
-      document.documentElement.style.setProperty("--water-top", displayedWaterPercent + "vh");
-      heightLabel.textContent =
-        "水面位置: " + waterPercent + "% / 表示: " + displayedWaterPercent.toFixed(1) + "%";
-      document.body.classList.toggle("is-fixed", waterFixed);
-    }
-
-    function updateWaterVisibility() {
-      document.body.classList.toggle("water-off", !waterVisible);
-      saveState();
-    }
-
-    function applyUIState() {
-      document.body.classList.toggle("ui-compact", uiCompact);
-      document.body.classList.toggle("ui-hidden", uiHidden);
-      compactUiButton.textContent = uiCompact ? "UI戻す" : "UI小さく";
-    }
-
-    function toggleCompactUI() {
-      uiCompact = !uiCompact;
-      applyUIState();
-      saveState();
-    }
-
-    function hideUI() {
-      uiHidden = true;
-      applyUIState();
-    }
-
-    function showUI() {
-      uiHidden = false;
-      applyUIState();
-    }
-
-    function applyEffectSettings() {
-      const waterOpacity = waterDensity / 100;
-      const causticsOpacity = 0.08 + (waterDensity / 100) * 0.16;
-
-      document.documentElement.style.setProperty("--water-opacity", String(waterOpacity));
-      document.documentElement.style.setProperty("--caustics-opacity", String(causticsOpacity.toFixed(2)));
-
-      waterDensitySlider.value = String(waterDensity);
-      waveStrengthSlider.value = String(waveStrength);
-      gyroStrengthSlider.value = String(Math.round(gyroStrength * 100));
-    }
-
-    function showToast(message, duration = 2000) {
-      clearTimeout(toastTimer);
-      toast.textContent = message;
-      toast.classList.add("show");
-
-      toastTimer = setTimeout(() => {
-        toast.classList.remove("show");
-      }, duration);
-    }
-
-    function scheduleAutoHideAfterFix() {
-      clearTimeout(autoHideTimer);
-
-      uiCompact = true;
-      uiHidden = false;
-      applyUIState();
-      saveState();
-
-      autoHideTimer = setTimeout(() => {
-        if (waterFixed) {
-          uiHidden = true;
-          applyUIState();
-        }
-      }, 3000);
-    }
-
-    function enterExperienceMode() {
-      uiCompact = true;
-      uiHidden = true;
-      applyUIState();
-      showToast("体験表示に切り替えました", 1600);
-    }
-
-    function fixHeight() {
-      waterFixed = !waterFixed;
-      document.body.classList.toggle("is-fixed", waterFixed);
-      fixHeightButton.textContent = waterFixed ? "固定解除" : "この高さに固定";
-      saveState();
-
-      if (waterFixed) {
-        showToast("水面高さを固定しました", 2000);
-        updateStatus(
-          "水面高さを固定しました。\n" +
-          "ジャイロ補正を使う場合は、スマホを垂直にして「基準設定」を押してください。\n\n" +
-          getVideoDebugText()
-        );
-        scheduleAutoHideAfterFix();
-      } else {
-        clearTimeout(autoHideTimer);
-        showToast("水面高さの固定を解除しました", 1600);
-        updateStatus(
-          "水面高さの固定を解除しました。\n現在の水面位置: " + waterPercent + "%"
-        );
+      if (waterHeightSlider) {
+        waterHeightSlider.value = safePercent;
       }
     }
 
-    function resetHeight() {
-      waterPercent = 55;
-      displayedWaterPercent = 55;
-      baseWaterPercent = 55;
-      waterFixed = false;
-      basePitch = null;
-      baseRoll = null;
-      uiHidden = false;
-      clearTimeout(autoHideTimer);
-      heightSlider.value = "55";
-      fixHeightButton.textContent = "この高さに固定";
-
-      document.documentElement.style.setProperty("--water-rotate", "0deg");
-
-      applyWaterLevel();
-      applyUIState();
-      updateGyroDebug();
-      saveState();
-
-      updateStatus("水面高さを初期化しました。\n現在の水面位置: 55%");
+    if (cameraStartBtn) {
+      cameraStartBtn.addEventListener("click", startCamera);
     }
 
-    async function toggleGyro() {
-      if (gyroEnabled) {
-        disableGyro();
-        return;
-      }
-
-      await enableGyro();
+    if (waterHeightSlider) {
+      waterHeightSlider.addEventListener("input", (event) => {
+        setWaterLinePosition(event.target.value);
+      });
     }
 
-    async function enableGyro() {
-      try {
-        if (typeof DeviceOrientationEvent === "undefined") {
-          throw new Error("DeviceOrientationEvent が利用できません。");
-        }
-
-        if (typeof DeviceOrientationEvent.requestPermission === "function") {
-          const permission = await DeviceOrientationEvent.requestPermission();
-
-          if (permission !== "granted") {
-            showToast("センサー利用が許可されませんでした");
-            updateStatus("ジャイロ補正を利用できませんでした。\n手動方式で続行できます。");
-            return;
-          }
-        }
-
-        window.addEventListener("deviceorientation", handleOrientation, true);
-
-        gyroEnabled = true;
-        gyroReady = true;
-        enableGyroButton.textContent = "ジャイロ補正OFF";
-
-        showToast("ジャイロ補正をONにしました");
-        updateStatus(
-          "ジャイロ補正をONにしました。\nスマホをなるべく垂直にして「基準設定」を押してください。"
-        );
-        updateGyroDebug();
-      } catch (error) {
-        gyroEnabled = false;
-        gyroReady = false;
-        console.error(error);
-        showToast("ジャイロ補正を利用できません");
-        updateStatus("ジャイロ補正を利用できません。\n手動方式で続行できます。\n\n" + String(error.message || error));
-      }
-    }
-
-    function disableGyro() {
-      window.removeEventListener("deviceorientation", handleOrientation, true);
-
-      gyroEnabled = false;
-      enableGyroButton.textContent = "ジャイロ補正ON";
-
-      displayedWaterPercent = waterPercent;
-      document.documentElement.style.setProperty("--water-rotate", "0deg");
-      applyWaterLevel();
-
-      showToast("ジャイロ補正をOFFにしました");
-      updateGyroDebug();
-    }
-
-    function handleOrientation(event) {
-      if (!gyroEnabled) return;
-
-      const beta = Number.isFinite(event.beta) ? event.beta : 0;
-      const gamma = Number.isFinite(event.gamma) ? event.gamma : 0;
-
-      currentPitch = beta;
-      currentRoll = gamma;
-
-      smoothedPitch = smoothedPitch * 0.85 + currentPitch * 0.15;
-      smoothedRoll = smoothedRoll * 0.85 + currentRoll * 0.15;
-
-      applyGyroWaterCorrection();
-      updateGyroDebug();
-    }
-
-    function setGyroBaseline() {
-      if (!gyroEnabled) {
-        showToast("先にジャイロ補正をONにしてください");
-        return;
-      }
-
-      basePitch = smoothedPitch;
-      baseRoll = smoothedRoll;
-      baseWaterPercent = waterPercent;
-
-      showToast("基準姿勢を設定しました");
-      updateStatus(
-        "基準姿勢を設定しました。\n" +
-        "スマホの上下の傾きに応じて、水面ラインを補正します。"
-      );
-      updateGyroDebug();
-    }
-
-    function invertGyroDirection() {
-      gyroDirection *= -1;
-      saveState();
-      showToast("補正方向を反転しました");
-      updateGyroDebug();
-    }
-
-    function applyGyroWaterCorrection() {
-      if (!gyroEnabled || basePitch === null || baseRoll === null) {
-        return;
-      }
-
-      const screenH = window.innerHeight;
-      const baseY = (baseWaterPercent / 100) * screenH;
-
-      const deltaPitchDeg = smoothedPitch - basePitch;
-      const deltaPitchRad = deltaPitchDeg * Math.PI / 180;
-
-      const focalPx = screenH * 0.85;
-
-      const correctionPx =
-        Math.tan(deltaPitchRad) * focalPx * gyroStrength * gyroDirection;
-
-      const correctedY = clamp(baseY + correctionPx, screenH * 0.08, screenH * 0.95);
-      displayedWaterPercent = (correctedY / screenH) * 100;
-
-      const deltaRollDeg = smoothedRoll - baseRoll;
-      const rollDeg = clamp(deltaRollDeg * 0.22, -5, 5);
-
-      document.documentElement.style.setProperty("--water-top", displayedWaterPercent + "vh");
-      document.documentElement.style.setProperty("--water-rotate", rollDeg.toFixed(2) + "deg");
-
-      heightLabel.textContent =
-        "水面位置: " + waterPercent + "% / 補正表示: " + displayedWaterPercent.toFixed(1) + "%";
-    }
-
-    function updateGyroDebug() {
-      const lines = [
-        "ジャイロ補正: " + (gyroEnabled ? "ON" : "OFF"),
-        "基準設定: " + (basePitch === null ? "未設定" : "設定済み"),
-        "pitch: " + smoothedPitch.toFixed(2),
-        "roll: " + smoothedRoll.toFixed(2),
-        "basePitch: " + (basePitch === null ? "-" : basePitch.toFixed(2)),
-        "baseRoll: " + (baseRoll === null ? "-" : baseRoll.toFixed(2)),
-        "補正強度: " + gyroStrength.toFixed(2),
-        "補正方向: " + (gyroDirection === 1 ? "通常" : "反転")
-      ];
-
-      gyroDebug.textContent = lines.join("\n");
-    }
-
-    function animateWave(time) {
-      const t = time * 0.001;
-      const d1 = buildWavePath(1200, 100, waveStrength, t, 1.28);
-      const d2 = buildWavePath(1200, 100, Math.max(3, waveStrength * 0.56), t + 1.3, 1.05);
-
-      waveShadow.setAttribute("d", d1);
-      waveHighlight.setAttribute("d", d1);
-      waveThin.setAttribute("d", d2);
-
-      requestAnimationFrame(animateWave);
-    }
-
-    function buildWavePath(width, height, amp, phase, speed) {
-      const mid = height / 2;
-      const step = 120;
-      let d = "M0," + mid;
-
-      for (let x = 0; x <= width; x += step) {
-        const x1 = x + step / 2;
-        const x2 = x + step;
-        const y1 = mid + Math.sin((x / width) * Math.PI * 4 + phase * speed) * amp;
-        const y2 = mid + Math.sin((x2 / width) * Math.PI * 4 + phase * speed) * amp;
-        d += " Q" + x1 + "," + y1 + " " + x2 + "," + y2;
-      }
-
-      return d;
-    }
-
-    function clamp(value, min, max) {
-      return Math.max(min, Math.min(max, value));
-    }
-
-    startCameraButton.addEventListener("click", startCamera);
-
-    stopCameraButton.addEventListener("click", () => {
-      stopCamera();
-      updateStatus("カメラを停止しました。");
+    document.querySelectorAll("[data-height]").forEach((button) => {
+      button.addEventListener("click", () => {
+        setWaterLinePosition(button.dataset.height);
+      });
     });
 
-    toggleWaterButton.addEventListener("click", () => {
-      waterVisible = !waterVisible;
-      updateWaterVisibility();
-      updateStatus("水表現: " + (waterVisible ? "ON" : "OFF"));
-    });
-
-    fixHeightButton.addEventListener("click", fixHeight);
-    experienceModeButton.addEventListener("click", enterExperienceMode);
-    resetHeightButton.addEventListener("click", resetHeight);
-    compactUiButton.addEventListener("click", toggleCompactUI);
-    hideUiButton.addEventListener("click", hideUI);
-    showPanelButton.addEventListener("click", showUI);
-
-    enableGyroButton.addEventListener("click", toggleGyro);
-    setGyroBaseButton.addEventListener("click", setGyroBaseline);
-    invertGyroButton.addEventListener("click", invertGyroDirection);
-
-    waterUpButton.addEventListener("click", () => {
-      setWaterPercent(waterPercent - 2);
-      updateStatus("水面を上げました。\n現在の水面位置: " + waterPercent + "%");
-    });
-
-    waterDownButton.addEventListener("click", () => {
-      setWaterPercent(waterPercent + 2);
-      updateStatus("水面を下げました。\n現在の水面位置: " + waterPercent + "%");
-    });
-
-    heightSlider.addEventListener("input", () => {
-      setWaterPercent(Number(heightSlider.value));
-    });
-
-    waterDensitySlider.addEventListener("input", () => {
-      waterDensity = clamp(Number(waterDensitySlider.value), 35, 100);
-      applyEffectSettings();
-      saveState();
-    });
-
-    waveStrengthSlider.addEventListener("input", () => {
-      waveStrength = clamp(Number(waveStrengthSlider.value), 3, 18);
-      applyEffectSettings();
-      saveState();
-    });
-
-    gyroStrengthSlider.addEventListener("input", () => {
-      gyroStrength = clamp(Number(gyroStrengthSlider.value) / 100, 0, 1);
-      applyEffectSettings();
-      saveState();
-      updateGyroDebug();
-    });
-
-    fixHeightButton.textContent = waterFixed ? "固定解除" : "この高さに固定";
-    applyUIState();
+    // 初期位置
+    setWaterLinePosition(50);
   </script>
+
+  <!-- スマホ姿勢ナビ用JS -->
+  <script src="./postureGuide.js"></script>
 </body>
 </html>
